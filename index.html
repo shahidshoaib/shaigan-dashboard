@@ -1074,7 +1074,7 @@
     isPreviewOnly = false;
     activeDatasetId = id;
     $('datasetSelect').value = id;
-    $('datasetMeta').textContent = `${meta.name} · uploaded by ${meta.uploadedBy || 'Unknown'} · ${formatAdded(meta.uploadedAt)}${meta.description ? ' — ' + meta.description : ''}`;
+    $('datasetMeta').innerHTML = `${meta.name} · uploaded by ${meta.uploadedBy || 'Unknown'} · ${formatAdded(meta.uploadedAt)}${meta.description ? ' — ' + meta.description : ''}`;
     try {
       const url = await storage.ref('datasets/' + id + '.json').getDownloadURL();
       const res = await fetch(url);
