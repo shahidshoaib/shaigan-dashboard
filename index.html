@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+<title>Shaigan Group | Management Dashboard</title>
+
+<!-- ============================================================
+     DEPENDENCIES (CDN — zero build step, GitHub Pages ready)
+     Firebase compat SDK — check https://firebase.google.com/docs/web/setup
+     for the latest version number if you want to bump it later.
+     ============================================================ -->
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/xlsx@latest/dist/xlsx.full.min.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        colors: {
+          emerald: { DEFAULT: '#0B4F3F', light: '#0F6B54', dark: '#073A2D', pale: '#E7F0EC' },
+          navy:    { DEFAULT: '#122C45', light: '#1C4066', dark: '#0B1D2E', pale: '#E8EDF3' },
+          burgundy:{ DEFAULT: '#6E1423', light: '#8C2233', dark: '#4E0E19', pale: '#F3E7E9' },
+          gold:    { DEFAULT: '#A9812F', light: '#C9A354', dark: '#7C5F22', pale: '#F5EFE1' },
+          ink:     { DEFAULT: '#171B19', muted: '#5B655F', faint: '#8A938D' },
+          canvas:  '#F5F6F5',
+          line:    '#E2E5E2'
+        },
+        boxShadow: { card: '0 1px 2px rgba(15,23,20,0.06), 0 1px 0 rgba(15,23,20,0.04)' }
+      }
+    }
+  };
+</script>
+
+<style>
+  :root { color-scheme: light; }
+  * { -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background: #F5F6F5; }
+
+  .app-section { display: none; }
+  .app-section.active { display: block; }
+
+  #sidebar { transition: transform .25s ease; }
+  @media (max-width: 1023px) {
+    #sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; transform: translateX(-100%); width: 17rem; }
+    #sidebar.open { transform: translateX(0); }
+  }
+
+  @keyframes shakeX { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
+  .shake { animation: shakeX .45s cubic-bezier(.36,.07,.19,.97) both; }
+
+  .data-table-wrap { overflow-x: auto; }
+  table.data-table { border-collapse: collapse; width: 100%; font-size: 0.83rem; }
+  table.data-table th, table.data-table td { padding: 0.55rem 0.75rem; text-align: left; white-space: nowrap; }
+  table.data-table thead th { position: sticky; top: 0; background: #F5F6F5; border-bottom: 1px solid #E2E5E2; font-weight: 600; color: #5B655F; font-size: 0.72rem; letter-spacing: .01em; }
+  table.data-table tbody tr { border-bottom: 1px solid #EEF0EE; }
+  table.data-table tbody tr:hover { background: #FAFAF9; }
+
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid #0B4F3F; outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-thumb { background: #D3D7D3; border-radius: 4px; }
+
+  #pdfFrame { width: 100%; height: 68vh; border: 1px solid #E2E5E2; background: #fff; }
+
+  .modal-overlay { display: none; }
+  .modal-overlay.open { display: flex; }
+
+  .tab-btn[data-active="true"] { color: #171B19; border-color: #171B19; }
+
+  #bootScreen { display: flex; }
+  #bootScreen.hidden-boot { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+</style>
+</head>
+
+<body class="text-ink antialiased">
+
+<!-- Boot / connecting screen — shown while Firebase resolves auth state -->
+<div id="bootScreen" class="min-h-screen items-center justify-center bg-canvas">
+  <div class="text-center">
+    <div class="w-10 h-10 rounded-md bg-emerald text-white flex items-center justify-center mx-auto mb-3"><i class="fa-solid fa-chess-rook"></i></div>
+    <p class="text-sm text-ink-muted"><i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Connecting...</p>
+  </div>
+</div>
+
+<!-- ================================================================
+     1. LOGIN SCREEN — Firebase email/password authentication
+     ================================================================ -->
+<div id="loginScreen" class="hidden min-h-screen grid lg:grid-cols-2">
+
+  <div class="hidden lg:flex flex-col justify-between bg-emerald text-white p-12 relative overflow-hidden">
+    <div class="absolute inset-0 opacity-[0.08]" style="background-image:radial-gradient(circle at 20% 20%, white 1px, transparent 1px);background-size:26px 26px;"></div>
+    <div class="relative z-10">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-md bg-white/10 border border-white/25 flex items-center justify-center">
+          <i class="fa-solid fa-chess-rook text-lg"></i>
+        </div>
+        <div>
+          <p class="text-lg font-bold leading-none">SHAIGAN GROUP</p>
+          <p class="text-[11px] text-white/60 leading-none mt-1">Management Dashboard</p>
+        </div>
+      </div>
+    </div>
+    <div class="relative z-10 max-w-md">
+      <p class="text-3xl font-semibold leading-snug">One console for strategy, operations and finance.</p>
+      <p class="mt-4 text-white/65 text-sm leading-relaxed">Sign in with the email GM Finance registered for you. Your data is synced securely across every device you use.</p>
+    </div>
+    <div class="relative z-10 flex items-center gap-6 text-white/50 text-xs">
+      <span><i class="fa-solid fa-shield-halved mr-1.5"></i>Secured by Firebase Auth</span>
+      <span><i class="fa-solid fa-cloud mr-1.5"></i>Synced across devices</span>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-center p-6 sm:p-10">
+    <div class="w-full max-w-md">
+
+      <div class="lg:hidden flex items-center gap-3 mb-8">
+        <div class="w-10 h-10 rounded-md bg-emerald text-white flex items-center justify-center"><i class="fa-solid fa-chess-rook"></i></div>
+        <div>
+          <p class="font-bold leading-none">SHAIGAN GROUP</p>
+          <p class="text-[11px] text-ink-muted leading-none mt-1">Management Dashboard</p>
+        </div>
+      </div>
+
+      <h1 class="text-xl font-bold text-ink">Sign in</h1>
+      <p class="text-sm text-ink-muted mt-1">Enter the email and password issued to you by GM Finance.</p>
+
+      <form id="loginForm" class="mt-6" autocomplete="off">
+        <label for="usernameInput" class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Email address</label>
+        <input id="usernameInput" type="email" placeholder="you@company.com" required
+               class="w-full rounded-md border border-line bg-white px-3.5 py-2.5 text-sm focus:border-emerald outline-none mb-4" />
+
+        <label for="passwordInput" class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Password</label>
+        <div class="relative">
+          <input id="passwordInput" type="password" placeholder="Enter password" required
+                 class="w-full rounded-md border border-line bg-white px-3.5 py-2.5 pr-10 text-sm focus:border-emerald outline-none" />
+          <button type="button" id="togglePw" aria-label="Show password"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink-muted text-sm">
+            <i class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+        <p id="loginError" class="hidden mt-2 text-xs text-burgundy"><i class="fa-solid fa-circle-exclamation mr-1"></i></p>
+
+        <button type="submit" id="loginSubmit"
+                class="mt-4 w-full rounded-md bg-ink text-white text-sm font-semibold py-2.5 hover:opacity-90 transition">
+          Sign in <i class="fa-solid fa-arrow-right ml-1"></i>
+        </button>
+
+        <button type="button" id="forgotPwBtn" class="mt-3 w-full text-xs font-semibold text-ink-muted hover:text-ink text-center">Forgot your password?</button>
+        <p id="forgotPwMsg" class="hidden mt-2 text-xs text-emerald text-center"></p>
+      </form>
+
+      <p class="mt-6 text-[11px] text-ink-faint leading-relaxed">Accounts are created by GM Finance from the Admin Panel. New users receive a "set your password" email — GM Finance never sees or sets your password directly.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================================================================
+     2. APPLICATION SHELL
+     ================================================================ -->
+<div id="appShell" class="hidden min-h-screen">
+
+  <header class="sticky top-0 z-30 bg-white border-b border-line">
+    <div class="h-16 px-4 sm:px-6 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <button id="sidebarToggle" class="lg:hidden w-9 h-9 rounded-md border border-line flex items-center justify-center text-ink-muted" aria-label="Toggle menu">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="w-9 h-9 rounded-md bg-emerald text-white flex items-center justify-center shrink-0"><i class="fa-solid fa-chess-rook text-sm"></i></div>
+        <div class="leading-none hidden sm:block">
+          <p class="font-bold text-sm">SHAIGAN GROUP</p>
+          <p class="text-[10px] text-ink-muted mt-0.5">Management Dashboard</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div id="roleBadge" class="hidden sm:flex items-center gap-2 rounded-full border border-line pl-1 pr-3 py-1">
+          <span id="roleBadgeDot" class="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold"></span>
+          <span id="roleBadgeText" class="text-xs font-semibold"></span>
+        </div>
+        <button id="logoutBtn" class="text-xs font-semibold flex items-center gap-1.5 rounded-md border border-line px-3 py-2 hover:bg-canvas transition">
+          <i class="fa-solid fa-right-from-bracket"></i><span class="hidden sm:inline">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex">
+    <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/30 z-30 lg:hidden"></div>
+
+    <aside id="sidebar" class="w-64 shrink-0 bg-white border-r border-line lg:min-h-[calc(100vh-4rem)] pt-4 pb-6">
+      <nav id="sidebarNav" class="px-3 space-y-1"></nav>
+      <div class="px-3 mt-8">
+        <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wide px-2 mb-2">Signed in as</p>
+        <div id="portalLabel" class="px-2 py-2 rounded-md text-xs font-medium text-ink-muted bg-canvas"></div>
+      </div>
+    </aside>
+
+    <main class="flex-1 min-w-0 p-4 sm:p-6 lg:p-8">
+
+      <!-- ---------- Dashboard ---------- -->
+      <section id="section-dashboard" class="app-section">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-6">
+          <div>
+            <h1 id="dashHeading" class="text-xl sm:text-2xl font-bold">Overview</h1>
+            <p class="text-sm text-ink-muted mt-1">Snapshot across your reports and data.</p>
+          </div>
+          <div class="text-xs text-ink-faint" id="clockText"></div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8" id="dashKpis"></div>
+
+        <div class="grid lg:grid-cols-3 gap-4 sm:gap-6">
+          <div class="lg:col-span-2 bg-white border border-line rounded-lg p-5">
+            <h2 class="text-sm font-bold mb-4">Reports available to you</h2>
+            <div id="dashReportList" class="divide-y divide-line"></div>
+          </div>
+          <div class="bg-white border border-line rounded-lg p-5">
+            <h2 class="text-sm font-bold mb-4">Session</h2>
+            <ul class="text-sm text-ink-muted space-y-3">
+              <li class="flex justify-between"><span>Name</span><span id="sessName" class="font-semibold text-ink"></span></li>
+              <li class="flex justify-between"><span>Role</span><span id="sessRole" class="font-semibold text-ink"></span></li>
+              <li class="flex justify-between"><span>Email</span><span id="sessEmail" class="font-semibold text-ink"></span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Report Archive ---------- -->
+      <section id="section-reports" class="app-section">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">Report archive</h1>
+            <p class="text-sm text-ink-muted mt-1">Review, mark, and open the reports you have access to.</p>
+          </div>
+        </div>
+
+        <div id="reportsEmptyState" class="hidden text-center py-16 text-ink-faint bg-white border border-line rounded-lg">
+          <i class="fa-solid fa-lock text-3xl mb-3"></i>
+          <p class="text-sm">You don't have access to any reports yet. Ask GM Finance to grant access from the Admin Panel.</p>
+        </div>
+
+        <div id="reportsViewerWrap">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+            <select id="reportSelect" class="w-full sm:w-80 rounded-md border border-line bg-white px-3 py-2.5 text-sm"></select>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span id="reportStatusTag" class="text-xs font-semibold px-2.5 py-1.5 rounded-full"></span>
+              <button id="markReviewed" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-check mr-1"></i>Mark Reviewed</button>
+              <button id="markPending" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-clock mr-1"></i>Mark Pending</button>
+            </div>
+          </div>
+
+          <div class="bg-white border border-line rounded-lg overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas">
+              <p id="reportMeta" class="text-xs text-ink-muted"></p>
+              <div class="flex items-center gap-2">
+                <a id="downloadBtn" target="_blank" rel="noopener" class="text-xs font-semibold px-3 py-1.5 rounded-md border border-line bg-white hover:bg-canvas"><i class="fa-solid fa-download mr-1.5"></i>Download / Open</a>
+                <button id="fullscreenBtn" class="text-xs font-semibold px-3 py-1.5 rounded-md border border-line bg-white hover:bg-canvas"><i class="fa-solid fa-expand mr-1.5"></i>Fullscreen</button>
+              </div>
+            </div>
+            <iframe id="pdfFrame" title="Report viewer"></iframe>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Data Library ---------- -->
+      <section id="section-library" class="app-section">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">Data library</h1>
+            <p class="text-sm text-ink-muted mt-1">Every document you have access to, split by how it was added.</p>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4 mb-6">
+          <div class="bg-white border border-line rounded-lg p-4">
+            <p class="text-xs text-ink-muted">Uploaded files</p>
+            <p id="libraryUploadedCount" class="text-2xl font-bold mt-1">0</p>
+          </div>
+          <div class="bg-white border border-line rounded-lg p-4">
+            <p class="text-xs text-ink-muted">Linked (web URL) documents</p>
+            <p id="libraryLinkedCount" class="text-2xl font-bold mt-1">0</p>
+          </div>
+        </div>
+
+        <div class="mb-8">
+          <h2 class="text-sm font-bold mb-3 flex items-center gap-2"><i class="fa-solid fa-file-arrow-up text-ink-faint"></i>Uploaded documents</h2>
+          <div class="bg-white border border-line rounded-lg overflow-hidden">
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Name</th><th>Department</th><th>Added</th><th>Added by</th><th>Status</th><th></th></tr></thead>
+                <tbody id="libraryUploadedBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-sm font-bold mb-3 flex items-center gap-2"><i class="fa-solid fa-link text-ink-faint"></i>Linked documents (web URL only)</h2>
+          <div class="bg-white border border-line rounded-lg overflow-hidden">
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Name</th><th>Department</th><th>Link</th><th>Added</th><th>Status</th><th></th></tr></thead>
+                <tbody id="libraryLinkedBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Data Analysis ---------- -->
+      <section id="section-data" class="app-section">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">Data analysis</h1>
+            <p class="text-sm text-ink-muted mt-1">Upload a spreadsheet to extract KPIs and browse the data. This stays local to your session — not synced.</p>
+          </div>
+        </div>
+
+        <div id="uploadZone" class="bg-white border border-dashed border-line rounded-lg p-6 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-md bg-emerald-pale text-emerald flex items-center justify-center"><i class="fa-solid fa-file-arrow-up"></i></div>
+            <div>
+              <p class="text-sm font-semibold">Upload .xlsx, .xls or .csv</p>
+              <p class="text-xs text-ink-muted">Parsed locally in your browser — nothing is uploaded anywhere.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="sampleDataBtn" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas">Load sample data</button>
+            <label for="fileInput" class="cursor-pointer text-xs font-semibold px-3 py-2 rounded-md bg-ink text-white hover:opacity-90">
+              <i class="fa-solid fa-upload mr-1.5"></i>Choose file
+            </label>
+            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+          </div>
+        </div>
+
+        <div id="dataEmptyState" class="text-center py-16 text-ink-faint">
+          <i class="fa-solid fa-table text-3xl mb-3"></i>
+          <p class="text-sm">No data loaded yet. Upload a file or load sample data to begin.</p>
+        </div>
+
+        <div id="dataResults" class="hidden">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" id="dataKpis"></div>
+          <div class="bg-white border border-line rounded-lg overflow-hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-line">
+              <div class="relative w-full sm:w-72">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-ink-faint"></i>
+                <input id="tableSearch" type="text" placeholder="Search rows..." class="w-full rounded-md border border-line pl-8 pr-3 py-2 text-sm" />
+              </div>
+              <div class="flex items-center gap-2">
+                <select id="colFilterSelect" class="rounded-md border border-line px-2.5 py-2 text-xs"></select>
+                <span class="text-xs text-ink-muted" id="rowCountLabel"></span>
+              </div>
+            </div>
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr id="tableHeadRow"></tr></thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+            <div class="flex items-center justify-between px-4 py-3 border-t border-line">
+              <button id="prevPage" class="text-xs font-semibold px-3 py-1.5 rounded-md border border-line hover:bg-canvas disabled:opacity-30"><i class="fa-solid fa-chevron-left mr-1"></i>Prev</button>
+              <span id="pageLabel" class="text-xs text-ink-muted"></span>
+              <button id="nextPage" class="text-xs font-semibold px-3 py-1.5 rounded-md border border-line hover:bg-canvas disabled:opacity-30">Next<i class="fa-solid fa-chevron-right ml-1"></i></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Admin Panel (GM Finance only) ---------- -->
+      <section id="section-admin" class="app-section">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">Admin panel</h1>
+            <p class="text-sm text-ink-muted mt-1">Manage user logins and control who can see which reports.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1 border-b border-line mb-5">
+          <button class="tab-btn text-sm font-semibold px-4 py-2.5 border-b-2 border-transparent text-ink-muted" data-tab="users" data-active="true">Users</button>
+          <button class="tab-btn text-sm font-semibold px-4 py-2.5 border-b-2 border-transparent text-ink-muted" data-tab="reports">Report library</button>
+        </div>
+
+        <div id="tab-users" class="tab-panel">
+          <div class="flex justify-end mb-3">
+            <button id="addUserBtn" class="text-xs font-semibold px-3 py-2 rounded-md bg-ink text-white hover:opacity-90"><i class="fa-solid fa-user-plus mr-1.5"></i>Add user</button>
+          </div>
+          <div class="bg-white border border-line rounded-lg overflow-hidden">
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Reports</th><th>Status</th><th></th></tr></thead>
+                <tbody id="usersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-reports" class="tab-panel hidden">
+          <div class="flex justify-end mb-3">
+            <button id="addReportBtn" class="text-xs font-semibold px-3 py-2 rounded-md bg-ink text-white hover:opacity-90"><i class="fa-solid fa-file-circle-plus mr-1.5"></i>Upload report</button>
+          </div>
+          <div class="bg-white border border-line rounded-lg overflow-hidden">
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Report</th><th>Department</th><th>Source</th><th>Added</th><th>Users with access</th><th></th></tr></thead>
+                <tbody id="reportsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Settings ---------- -->
+      <section id="section-settings" class="app-section">
+        <h1 class="text-xl sm:text-2xl font-bold mb-1">Settings</h1>
+        <p class="text-sm text-ink-muted mb-6">Preferences for this device.</p>
+
+        <div class="bg-white border border-line rounded-lg p-5 max-w-lg space-y-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-semibold">Clear loaded spreadsheet data</p>
+              <p class="text-xs text-ink-muted mt-0.5">Removes the currently parsed table from memory on this device.</p>
+            </div>
+            <button id="clearDataBtn" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas shrink-0">Clear</button>
+          </div>
+          <div class="flex items-center justify-between border-t border-line pt-5">
+            <div>
+              <p class="text-sm font-semibold">Change your password</p>
+              <p class="text-xs text-ink-muted mt-0.5">Sends a password reset link to your own email.</p>
+            </div>
+            <button id="selfResetPwBtn" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas shrink-0">Send link</button>
+          </div>
+          <div class="flex items-center justify-between border-t border-line pt-5">
+            <div>
+              <p class="text-sm font-semibold">End session</p>
+              <p class="text-xs text-ink-muted mt-0.5">Logs you out and returns to the sign-in screen.</p>
+            </div>
+            <button id="settingsLogoutBtn" class="text-xs font-semibold px-3 py-2 rounded-md bg-burgundy text-white hover:opacity-90 shrink-0">Logout</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+
+<!-- ================================================================
+     3. MODALS
+     ================================================================ -->
+
+<div id="userModal" class="modal-overlay fixed inset-0 z-50 items-center justify-center bg-black/40 p-4">
+  <div class="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+      <h3 id="userModalTitle" class="text-sm font-bold">Add user</h3>
+      <button data-close-modal="userModal" class="text-ink-faint hover:text-ink"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="userForm" class="px-5 py-4 space-y-4">
+      <input type="hidden" id="userFormId" />
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Full name</label>
+        <input id="userFormName" type="text" required class="w-full rounded-md border border-line px-3 py-2 text-sm" placeholder="e.g. Ahmed Raza" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Email</label>
+          <input id="userFormEmail" type="email" required class="w-full rounded-md border border-line px-3 py-2 text-sm" placeholder="name@company.com" />
+          <p id="userFormEmailNote" class="hidden text-[11px] text-ink-faint mt-1">Email can't be changed here once created.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Role</label>
+          <select id="userFormRole" class="w-full rounded-md border border-line px-3 py-2 text-sm">
+            <option value="ce">Chief Executive</option>
+            <option value="do">Director Operations</option>
+            <option value="ed">Executive Director</option>
+            <option value="gm_finance">GM Finance (Admin)</option>
+          </select>
+        </div>
+      </div>
+      <div id="createPwNote" class="text-xs text-ink-muted bg-canvas rounded-md px-3 py-2"><i class="fa-solid fa-envelope mr-1.5"></i>A "set your password" email will be sent to this address after saving.</div>
+      <div id="resetPwRow" class="hidden">
+        <button type="button" id="sendResetBtn" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-key mr-1.5"></i>Send password reset email</button>
+      </div>
+      <div class="flex items-center gap-6">
+        <label class="flex items-center gap-2 text-sm"><input id="userFormActive" type="checkbox" class="rounded" checked /> Active</label>
+        <label class="flex items-center gap-2 text-sm"><input id="userFormCanUpload" type="checkbox" class="rounded" checked /> Can upload spreadsheets</label>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Report access</label>
+        <div id="userFormReportAccess" class="border border-line rounded-md p-3 max-h-40 overflow-y-auto space-y-1.5"></div>
+      </div>
+      <p id="userFormError" class="hidden text-xs text-burgundy"><i class="fa-solid fa-circle-exclamation mr-1"></i></p>
+      <div class="flex items-center justify-between pt-2">
+        <button type="button" id="deactivateUserBtn" class="hidden text-xs font-semibold text-burgundy hover:underline">Deactivate user</button>
+        <div class="flex gap-2 ml-auto">
+          <button type="button" data-close-modal="userModal" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas">Cancel</button>
+          <button type="submit" id="userFormSubmitBtn" class="text-xs font-semibold px-4 py-2 rounded-md bg-ink text-white hover:opacity-90">Save user</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="reportModal" class="modal-overlay fixed inset-0 z-50 items-center justify-center bg-black/40 p-4">
+  <div class="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+      <h3 id="reportModalTitle" class="text-sm font-bold">Upload report</h3>
+      <button data-close-modal="reportModal" class="text-ink-faint hover:text-ink"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="reportForm" class="px-5 py-4 space-y-4">
+      <input type="hidden" id="reportFormId" />
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Report name</label>
+        <input id="reportFormName" type="text" required class="w-full rounded-md border border-line px-3 py-2 text-sm" placeholder="e.g. Q1 Financial Statement" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Department</label>
+          <select id="reportFormDept" class="w-full rounded-md border border-line px-3 py-2 text-sm">
+            <option>Executive</option><option>Operations</option><option>Finance</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Source</label>
+          <select id="reportFormSource" class="w-full rounded-md border border-line px-3 py-2 text-sm">
+            <option value="upload">Upload PDF file</option>
+            <option value="url">Link to a hosted PDF</option>
+          </select>
+        </div>
+      </div>
+      <div id="reportFormFileWrap">
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">PDF file</label>
+        <input id="reportFormFile" type="file" accept="application/pdf" class="w-full text-sm border border-line rounded-md px-3 py-2" />
+        <p class="text-[11px] text-ink-faint mt-1">Stored in Firebase Storage, synced to every user's device.</p>
+      </div>
+      <div id="reportFormUrlWrap" class="hidden">
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">PDF URL</label>
+        <input id="reportFormUrl" type="url" class="w-full rounded-md border border-line px-3 py-2 text-sm" placeholder="https://example.com/report.pdf" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Description (optional)</label>
+        <textarea id="reportFormDesc" rows="2" class="w-full rounded-md border border-line px-3 py-2 text-sm"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Grant access to</label>
+        <div id="reportFormAccess" class="border border-line rounded-md p-3 max-h-40 overflow-y-auto space-y-1.5"></div>
+      </div>
+      <p id="reportFormError" class="hidden text-xs text-burgundy"><i class="fa-solid fa-circle-exclamation mr-1"></i></p>
+      <div class="flex items-center justify-between pt-2">
+        <button type="button" id="deleteReportBtn" class="hidden text-xs font-semibold text-burgundy hover:underline">Delete report</button>
+        <div class="flex gap-2 ml-auto">
+          <button type="button" data-close-modal="reportModal" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas">Cancel</button>
+          <button type="submit" id="reportFormSubmitBtn" class="text-xs font-semibold px-4 py-2 rounded-md bg-ink text-white hover:opacity-90">Save report</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- ================================================================
+     4. APPLICATION LOGIC
+     ================================================================ -->
+<script>
+(function () {
+  "use strict";
+
+  /* --------------------------------------------------------------
+     4.1  FIREBASE SETUP
+     Paste your Firebase Web App config below (Firebase Console →
+     Project settings → General → Your apps → Web app → SDK config).
+     -------------------------------------------------------------- */
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyD3LDGfEEAMQLIwX4tkeAuotU4yESK_INk",
+    authDomain: "shaigan-group-dashboard.firebaseapp.com",
+    projectId: "shaigan-group-dashboard",
+    storageBucket: "shaigan-group-dashboard.firebasestorage.app",
+    messagingSenderId: "69655392733",
+    appId: "1:69655392733:web:05459949764c4e2f880634"
+  };
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+  // Secondary app instance: lets an admin create a new user's Auth
+  // account without hijacking the admin's own signed-in session.
+  const secondaryApp = firebase.initializeApp(FIREBASE_CONFIG, "Secondary");
+  const secondaryAuth = secondaryApp.auth();
+
+  const ROLE_META = {
+    ce:         { label: 'Chief Executive',       code: 'CE', accent: 'burgundy' },
+    do:         { label: 'Director Operations',   code: 'DO', accent: 'navy' },
+    ed:         { label: 'Executive Director',    code: 'ED', accent: 'emerald' },
+    gm_finance: { label: 'GM Finance (Admin)',     code: 'GM', accent: 'gold' }
+  };
+  const accentClasses = {
+    emerald: { pale: 'bg-emerald-pale', text: 'text-emerald', hex: '#0B4F3F' },
+    navy:    { pale: 'bg-navy-pale',    text: 'text-navy',    hex: '#122C45' },
+    burgundy:{ pale: 'bg-burgundy-pale',text: 'text-burgundy',hex: '#6E1423' },
+    gold:    { pale: 'bg-gold-pale',    text: 'text-gold',    hex: '#A9812F' }
+  };
+
+  const NAV_ITEMS = [
+    { key: 'dashboard', label: 'Dashboard', icon: 'fa-gauge-high' },
+    { key: 'reports',   label: 'Report Archive', icon: 'fa-file-pdf' },
+    { key: 'library',   label: 'Data Library', icon: 'fa-layer-group' },
+    { key: 'data',      label: 'Data Analysis', icon: 'fa-table-list' },
+    { key: 'admin',     label: 'Admin Panel', icon: 'fa-user-shield', adminOnly: true },
+    { key: 'settings',  label: 'Settings', icon: 'fa-gear' }
+  ];
+
+  function genPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    let out = '';
+    for (let i = 0; i < 16; i++) out += chars[Math.floor(Math.random() * chars.length)];
+    return out;
+  }
+
+  function friendlyAuthError(err) {
+    const map = {
+      'auth/invalid-email': 'That email address looks invalid.',
+      'auth/user-not-found': 'No account found for that email.',
+      'auth/wrong-password': 'Incorrect password.',
+      'auth/invalid-credential': 'Incorrect email or password.',
+      'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
+      'auth/network-request-failed': 'Network error — check your connection.'
+    };
+    return map[err.code] || (err.message || 'Something went wrong. Please try again.');
+  }
+
+  /* --------------------------------------------------------------
+     4.2  STATE
+     -------------------------------------------------------------- */
+  let currentUser = null;   // { id (uid), email, fullName, role, isAdmin, active, canUploadData, reportAccess }
+  let USERS = [];
+  let REPORTS = [];
+  let activeReportId = null;
+  let unsubUsers = null, unsubReports = null;
+  let subscribed = false;
+
+  let sheetData = { headers: [], rows: [] };
+  let filteredRows = [];
+  let currentPage = 1;
+  const PAGE_SIZE = 10;
+
+  const $ = (id) => document.getElementById(id);
+
+  function myReports() {
+    if (!currentUser) return [];
+    if (currentUser.isAdmin) return REPORTS.slice();
+    return REPORTS.filter((r) => (currentUser.reportAccess || []).includes(r.id));
+  }
+  function statusOf(reportId) {
+    const r = REPORTS.find((x) => x.id === reportId);
+    return (r && r.status) || 'pending';
+  }
+
+  /* --------------------------------------------------------------
+     4.3  AUTH FLOW
+     -------------------------------------------------------------- */
+  auth.onAuthStateChanged(async (fbUser) => {
+    $('bootScreen').classList.add('hidden-boot');
+    if (fbUser) {
+      try {
+        const doc = await db.collection('users').doc(fbUser.uid).get();
+        if (!doc.exists || doc.data().active !== true) {
+          await auth.signOut();
+          showLoginScreen('Your account is inactive or not fully set up yet. Contact GM Finance.');
+          return;
+        }
+        currentUser = { id: fbUser.uid, email: fbUser.email, ...doc.data() };
+        if (!subscribed) { subscribeCollections(); subscribed = true; }
+        enterApp(currentUser);
+      } catch (err) {
+        console.error(err);
+        showLoginScreen('Could not load your profile. Please try signing in again.');
+      }
+    } else {
+      showLoginScreen();
+    }
+  });
+
+  function showLoginScreen(errorMsg) {
+    $('appShell').classList.add('hidden');
+    $('loginScreen').classList.remove('hidden');
+    if (errorMsg) {
+      $('loginError').textContent = errorMsg;
+      $('loginError').classList.remove('hidden');
+    }
+  }
+
+  async function handleLoginSubmit(e) {
+    e.preventDefault();
+    const email = $('usernameInput').value.trim();
+    const pw = $('passwordInput').value;
+    $('loginError').classList.add('hidden');
+    const btn = $('loginSubmit');
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Signing in...';
+    try {
+      await auth.signInWithEmailAndPassword(email, pw);
+      // onAuthStateChanged handles the rest
+    } catch (err) {
+      $('loginError').textContent = friendlyAuthError(err);
+      $('loginError').classList.remove('hidden');
+      const form = $('loginForm');
+      form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
+    }
+    btn.disabled = false; btn.innerHTML = 'Sign in <i class="fa-solid fa-arrow-right ml-1"></i>';
+  }
+
+  async function handleForgotPassword() {
+    const email = $('usernameInput').value.trim();
+    if (!email) { $('loginError').textContent = 'Enter your email above first, then tap "Forgot your password?"'; $('loginError').classList.remove('hidden'); return; }
+    try {
+      await auth.sendPasswordResetEmail(email);
+      $('forgotPwMsg').textContent = 'Reset link sent — check your inbox.';
+      $('forgotPwMsg').classList.remove('hidden');
+    } catch (err) {
+      $('loginError').textContent = friendlyAuthError(err);
+      $('loginError').classList.remove('hidden');
+    }
+  }
+
+  /* --------------------------------------------------------------
+     4.4  REALTIME SYNC — Firestore listeners
+     -------------------------------------------------------------- */
+  function subscribeCollections() {
+    unsubUsers = db.collection('users').onSnapshot((snap) => {
+      USERS = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (currentUser) {
+        const fresh = USERS.find((u) => u.id === currentUser.id);
+        if (fresh) currentUser = fresh; else { auth.signOut(); return; }
+        if (!currentUser.active) { auth.signOut(); return; }
+        if (currentUser.isAdmin && !document.getElementById('section-admin').classList.contains('hidden')) renderUsersTable();
+        renderDashboard();
+      }
+    }, (err) => console.error('users listener error', err));
+
+    unsubReports = db.collection('reports').onSnapshot((snap) => {
+      REPORTS = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (currentUser) {
+        renderDashboard(); renderReportsSection(); renderDataLibrary();
+        if (currentUser.isAdmin) renderReportsTable();
+      }
+    }, (err) => console.error('reports listener error', err));
+  }
+
+  /* --------------------------------------------------------------
+     4.5  APP SHELL / NAVIGATION
+     -------------------------------------------------------------- */
+  function enterApp(user) {
+    $('loginScreen').classList.add('hidden');
+    $('appShell').classList.remove('hidden');
+    $('loginForm').reset();
+    $('loginError').classList.add('hidden');
+    $('forgotPwMsg').classList.add('hidden');
+
+    const meta = ROLE_META[user.role] || ROLE_META.ed;
+    const acc = accentClasses[meta.accent];
+    $('roleBadge').classList.remove('hidden');
+    $('roleBadgeDot').textContent = meta.code;
+    $('roleBadgeDot').style.backgroundColor = acc.hex;
+    $('roleBadgeText').textContent = user.fullName;
+    $('portalLabel').textContent = user.fullName + ' — ' + meta.label;
+
+    renderSidebarNav();
+    goToSection('dashboard');
+    renderDashboard();
+    renderReportsSection();
+    renderDataLibrary();
+    renderDataEmptyState();
+
+    $('sessName').textContent = user.fullName;
+    $('sessRole').textContent = meta.label;
+    $('sessEmail').textContent = user.email;
+
+    tickClock();
+  }
+
+  function renderSidebarNav() {
+    const nav = $('sidebarNav');
+    nav.innerHTML = '';
+    NAV_ITEMS.filter((item) => !item.adminOnly || currentUser.isAdmin).forEach((item) => {
+      const btn = document.createElement('button');
+      btn.className = 'nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-ink-muted hover:bg-canvas transition';
+      btn.dataset.section = item.key;
+      btn.innerHTML = `<i class="fa-solid ${item.icon} w-4 text-center"></i><span>${item.label}</span>`;
+      btn.addEventListener('click', () => { goToSection(item.key); closeMobileSidebar(); });
+      nav.appendChild(btn);
+    });
+  }
+
+  function goToSection(key) {
+    document.querySelectorAll('.app-section').forEach((s) => s.classList.remove('active'));
+    $('section-' + key).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach((btn) => {
+      const active = btn.dataset.section === key;
+      btn.classList.toggle('bg-canvas', active);
+      btn.classList.toggle('text-ink', active);
+      btn.style.color = active ? accentClasses[(ROLE_META[currentUser.role] || ROLE_META.ed).accent].hex : '';
+    });
+    if (key === 'dashboard') renderDashboard();
+    if (key === 'admin') renderAdminPanel();
+    if (key === 'library') renderDataLibrary();
+  }
+
+  function closeMobileSidebar() { $('sidebar').classList.remove('open'); $('sidebarOverlay').classList.add('hidden'); }
+
+  function tickClock() {
+    const el = $('clockText');
+    const update = () => { el.textContent = new Date().toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit', year: 'numeric', month: 'short', day: 'numeric' }); };
+    update(); setInterval(update, 30000);
+  }
+
+  /* --------------------------------------------------------------
+     4.6  DASHBOARD
+     -------------------------------------------------------------- */
+  function renderDashboard() {
+    if (!currentUser) return;
+    const meta = ROLE_META[currentUser.role] || ROLE_META.ed;
+    const acc = accentClasses[meta.accent];
+    $('dashHeading').textContent = currentUser.fullName + ' — ' + meta.label;
+
+    const mine = myReports();
+    const reviewedCount = mine.filter((r) => statusOf(r.id) === 'reviewed').length;
+    const pendingCount = mine.length - reviewedCount;
+
+    const kpis = [
+      { label: 'Reports available', value: mine.length, icon: 'fa-folder-open' },
+      { label: 'Reviewed', value: reviewedCount, icon: 'fa-check' },
+      { label: 'Pending approval', value: pendingCount, icon: 'fa-clock' },
+      { label: 'Spreadsheet rows loaded', value: sheetData.rows.length, icon: 'fa-table-cells' }
+    ];
+    if (currentUser.isAdmin) {
+      kpis.push({ label: 'Active users', value: USERS.filter((u) => u.active).length, icon: 'fa-users' });
+      kpis.push({ label: 'Reports in library', value: REPORTS.length, icon: 'fa-book' });
+    }
+
+    $('dashKpis').innerHTML = kpis.map((k) => `
+      <div class="bg-white border border-line rounded-lg p-4">
+        <div class="w-8 h-8 rounded-md ${acc.pale} ${acc.text} flex items-center justify-center mb-3"><i class="fa-solid ${k.icon} text-xs"></i></div>
+        <p class="text-2xl font-bold leading-none">${k.value}</p>
+        <p class="text-xs text-ink-muted mt-1.5">${k.label}</p>
+      </div>
+    `).join('');
+
+    $('dashReportList').innerHTML = mine.map((r) => {
+      const s = statusOf(r.id);
+      const badge = s === 'reviewed'
+        ? '<span class="text-[11px] font-semibold text-emerald bg-emerald-pale px-2 py-1 rounded-full">Reviewed</span>'
+        : '<span class="text-[11px] font-semibold text-burgundy bg-burgundy-pale px-2 py-1 rounded-full">Pending Approval</span>';
+      return `
+        <div class="flex items-center justify-between py-3">
+          <div><p class="text-sm font-semibold">${r.name}</p><p class="text-xs text-ink-muted">${r.dept}</p></div>
+          <div class="flex items-center gap-3">${badge}<button data-open-report="${r.id}" class="text-xs font-semibold ${acc.text} hover:underline">Open <i class="fa-solid fa-arrow-right ml-0.5"></i></button></div>
+        </div>`;
+    }).join('') || '<p class="text-sm text-ink-muted py-4">No reports have been assigned to you yet. Ask GM Finance to grant access.</p>';
+
+    document.querySelectorAll('[data-open-report]').forEach((btn) => {
+      btn.addEventListener('click', () => { goToSection('reports'); loadReport(btn.dataset.openReport); });
+    });
+  }
+
+  /* --------------------------------------------------------------
+     4.7  REPORT ARCHIVE
+     -------------------------------------------------------------- */
+  function renderReportsSection() {
+    if (!currentUser) return;
+    const mine = myReports();
+    const has = mine.length > 0;
+    $('reportsEmptyState').classList.toggle('hidden', has);
+    $('reportsViewerWrap').classList.toggle('hidden', !has);
+    if (!has) return;
+
+    const sel = $('reportSelect');
+    const prevSelection = sel.value;
+    sel.innerHTML = mine.map((r) => `<option value="${r.id}">${r.name} — ${r.dept}</option>`).join('');
+    sel.onchange = () => loadReport(sel.value);
+
+    const stillValid = mine.some((r) => r.id === prevSelection);
+    loadReport(stillValid ? prevSelection : mine[0].id);
+  }
+
+  async function loadReport(reportId) {
+    const report = REPORTS.find((r) => r.id === reportId);
+    if (!report) return;
+    activeReportId = report.id;
+    $('reportSelect').value = report.id;
+    $('reportMeta').textContent = `${report.name} · ${report.dept} department`;
+    $('pdfFrame').src = 'about:blank';
+
+    if (report.sourceType === 'uploaded') {
+      try {
+        const url = await storage.ref('reports/' + report.id).getDownloadURL();
+        $('pdfFrame').src = url;
+        $('downloadBtn').href = url;
+        $('downloadBtn').setAttribute('download', report.name + '.pdf');
+      } catch (err) {
+        console.error(err);
+        $('reportMeta').textContent += ' — file could not be loaded from storage';
+      }
+    } else {
+      $('pdfFrame').src = report.url;
+      $('downloadBtn').href = report.url;
+      $('downloadBtn').removeAttribute('download');
+    }
+    renderStatusTag();
+  }
+
+  function renderStatusTag() {
+    const s = statusOf(activeReportId);
+    const tag = $('reportStatusTag');
+    if (s === 'reviewed') { tag.textContent = 'Reviewed'; tag.className = 'text-xs font-semibold px-2.5 py-1.5 rounded-full text-emerald bg-emerald-pale'; }
+    else { tag.textContent = 'Pending Approval'; tag.className = 'text-xs font-semibold px-2.5 py-1.5 rounded-full text-burgundy bg-burgundy-pale'; }
+  }
+
+  async function setReportStatus(status) {
+    if (!activeReportId) return;
+    try {
+      await db.collection('reports').doc(activeReportId).update({ status });
+      // onSnapshot will re-render, but update immediately for responsiveness
+      renderStatusTag();
+    } catch (err) {
+      console.error(err);
+      alert('Could not update the status. Check your connection and permissions.');
+    }
+  }
+
+  /* --------------------------------------------------------------
+     4.8  DATA LIBRARY
+     -------------------------------------------------------------- */
+  function formatAdded(ts) {
+    if (!ts) return '<span class="text-ink-faint">—</span>';
+    const millis = ts.toMillis ? ts.toMillis() : ts;
+    return new Date(millis).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  function statusBadgeHtml(reportId) {
+    const s = statusOf(reportId);
+    return s === 'reviewed'
+      ? '<span class="text-[11px] font-semibold text-emerald bg-emerald-pale px-2 py-0.5 rounded-full">Reviewed</span>'
+      : '<span class="text-[11px] font-semibold text-burgundy bg-burgundy-pale px-2 py-0.5 rounded-full">Pending</span>';
+  }
+
+  function renderDataLibrary() {
+    if (!currentUser) return;
+    const mine = myReports();
+    const uploaded = mine.filter((r) => r.sourceType === 'uploaded');
+    const linked = mine.filter((r) => r.sourceType === 'url');
+
+    $('libraryUploadedCount').textContent = uploaded.length;
+    $('libraryLinkedCount').textContent = linked.length;
+
+    $('libraryUploadedBody').innerHTML = uploaded.map((r) => `
+      <tr>
+        <td class="font-semibold">${r.name}</td>
+        <td>${r.dept}</td>
+        <td>${formatAdded(r.uploadedAt)}</td>
+        <td>${r.uploadedBy || '<span class="text-ink-faint">—</span>'}</td>
+        <td>${statusBadgeHtml(r.id)}</td>
+        <td><button data-lib-open="${r.id}" class="text-xs font-semibold text-ink hover:underline">Open <i class="fa-solid fa-arrow-right ml-0.5"></i></button></td>
+      </tr>`).join('') || `<tr><td colspan="6" class="text-center text-ink-faint py-8">No uploaded documents in your library yet.</td></tr>`;
+
+    $('libraryLinkedBody').innerHTML = linked.map((r) => `
+      <tr>
+        <td class="font-semibold">${r.name}</td>
+        <td>${r.dept}</td>
+        <td class="max-w-[220px] truncate"><a href="${r.url}" target="_blank" rel="noopener" class="text-navy hover:underline">${r.url}</a></td>
+        <td>${formatAdded(r.uploadedAt)}</td>
+        <td>${statusBadgeHtml(r.id)}</td>
+        <td><button data-lib-open="${r.id}" class="text-xs font-semibold text-ink hover:underline">Open <i class="fa-solid fa-arrow-right ml-0.5"></i></button></td>
+      </tr>`).join('') || `<tr><td colspan="6" class="text-center text-ink-faint py-8">No linked documents in your library yet.</td></tr>`;
+
+    document.querySelectorAll('[data-lib-open]').forEach((btn) => {
+      btn.addEventListener('click', () => { goToSection('reports'); loadReport(btn.dataset.libOpen); });
+    });
+  }
+
+  /* --------------------------------------------------------------
+     4.9  DATA ANALYSIS (unchanged — local only, not synced)
+     -------------------------------------------------------------- */
+  function renderDataEmptyState() {
+    const has = sheetData.rows.length > 0;
+    $('dataEmptyState').classList.toggle('hidden', has);
+    $('dataResults').classList.toggle('hidden', !has);
+    const canUpload = !!(currentUser && currentUser.canUploadData);
+    $('uploadZone').classList.toggle('opacity-50', !canUpload);
+    $('fileInput').disabled = !canUpload;
+    $('sampleDataBtn').textContent = canUpload ? 'Load sample data' : 'Load sample data (view only)';
+  }
+
+  function handleFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        ingestRows(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
+      } catch (err) {
+        alert('Could not parse this file. Please check it is a valid .xlsx, .xls or .csv file.');
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function ingestRows(rows) {
+    if (!rows || rows.length === 0) { alert('No rows were found in this file.'); return; }
+    sheetData = { headers: Object.keys(rows[0]), rows };
+    filteredRows = rows.slice();
+    currentPage = 1;
+    renderDataEmptyState(); renderDataKpis(); renderColumnFilter(); renderTable();
+  }
+
+  function loadSampleData() {
+    ingestRows([
+      { Project: 'Emerald Tower Fit-Out', Department: 'Operations', Budget: 185000, Spent: 142300, Priority: 'High', Status: 'On Track' },
+      { Project: 'Q3 Compliance Review', Department: 'Finance', Budget: 42000, Spent: 39850, Priority: 'Medium', Status: 'On Track' },
+      { Project: 'Riverside Site Audit', Department: 'Operations', Budget: 96000, Spent: 101200, Priority: 'High', Status: 'At Risk' },
+      { Project: 'Vendor Contract Renewal', Department: 'Finance', Budget: 15000, Spent: 6400, Priority: 'Low', Status: 'On Track' },
+      { Project: 'Regional Expansion Study', Department: 'Executive', Budget: 260000, Spent: 88000, Priority: 'High', Status: 'In Progress' },
+      { Project: 'Payroll System Migration', Department: 'Finance', Budget: 54000, Spent: 51000, Priority: 'Critical', Status: 'In Progress' },
+      { Project: 'Warehouse Safety Audit', Department: 'Operations', Budget: 22000, Spent: 21750, Priority: 'Medium', Status: 'On Track' },
+      { Project: 'Investor Relations Deck', Department: 'Executive', Budget: 8000, Spent: 5200, Priority: 'Low', Status: 'On Track' },
+      { Project: 'Client Retention Program', Department: 'Operations', Budget: 33000, Spent: 40100, Priority: 'High', Status: 'At Risk' },
+      { Project: 'Annual Tax Filing', Department: 'Finance', Budget: 12000, Spent: 11890, Priority: 'Critical', Status: 'Pending' }
+    ]);
+  }
+
+  function numericColumns() {
+    return sheetData.headers.filter((h) =>
+      sheetData.rows.every((r) => r[h] === '' || r[h] === null || !isNaN(parseFloat(r[h])))
+      && sheetData.rows.some((r) => r[h] !== '' && r[h] !== null)
+    );
+  }
+  function priorityFlagCount() {
+    const flagCols = sheetData.headers.filter((h) => /priority|risk|status/i.test(h));
+    if (flagCols.length === 0) return 0;
+    return sheetData.rows.filter((r) => flagCols.some((c) => /high|critical|urgent|at risk/i.test(String(r[c])))).length;
+  }
+
+  function renderDataKpis() {
+    const numCols = numericColumns().slice(0, 2);
+    const acc = accentClasses[(ROLE_META[currentUser.role] || ROLE_META.ed).accent];
+    const kpis = [
+      { label: 'Total rows', value: sheetData.rows.length, icon: 'fa-table-cells' },
+      { label: 'Columns', value: sheetData.headers.length, icon: 'fa-columns' },
+      ...numCols.map((c) => ({ label: `Sum of ${c}`, value: sheetData.rows.reduce((s, r) => s + (parseFloat(r[c]) || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 }), icon: 'fa-calculator' })),
+      { label: 'High priority flags', value: priorityFlagCount(), icon: 'fa-flag' }
+    ].slice(0, 4);
+    $('dataKpis').innerHTML = kpis.map((k) => `
+      <div class="bg-white border border-line rounded-lg p-4">
+        <div class="w-8 h-8 rounded-md ${acc.pale} ${acc.text} flex items-center justify-center mb-3"><i class="fa-solid ${k.icon} text-xs"></i></div>
+        <p class="text-2xl font-bold leading-none truncate">${k.value}</p>
+        <p class="text-xs text-ink-muted mt-1.5">${k.label}</p>
+      </div>`).join('');
+  }
+  function renderColumnFilter() {
+    $('colFilterSelect').innerHTML = `<option value="__all__">All columns</option>` + sheetData.headers.map((h) => `<option value="${h}">${h}</option>`).join('');
+  }
+  function applyFilters() {
+    const term = $('tableSearch').value.trim().toLowerCase();
+    const col = $('colFilterSelect').value;
+    filteredRows = sheetData.rows.filter((row) => {
+      if (!term) return true;
+      if (col === '__all__') return Object.values(row).some((v) => String(v).toLowerCase().includes(term));
+      return String(row[col]).toLowerCase().includes(term);
+    });
+    currentPage = 1; renderTable();
+  }
+  function renderTable() {
+    $('tableHeadRow').innerHTML = sheetData.headers.map((h) => `<th>${h}</th>`).join('');
+    const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+    currentPage = Math.min(currentPage, totalPages);
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageRows = filteredRows.slice(start, start + PAGE_SIZE);
+    $('tableBody').innerHTML = pageRows.map((row) => `<tr>${sheetData.headers.map((h) => `<td>${row[h] === '' || row[h] == null ? '—' : row[h]}</td>`).join('')}</tr>`).join('')
+      || `<tr><td colspan="${sheetData.headers.length}" class="text-center text-ink-faint py-8">No matching rows.</td></tr>`;
+    $('rowCountLabel').textContent = `${filteredRows.length} row${filteredRows.length === 1 ? '' : 's'}`;
+    $('pageLabel').textContent = `Page ${currentPage} of ${totalPages}`;
+    $('prevPage').disabled = currentPage <= 1;
+    $('nextPage').disabled = currentPage >= totalPages;
+  }
+
+  /* --------------------------------------------------------------
+     4.10  ADMIN PANEL — Users
+     -------------------------------------------------------------- */
+  function renderAdminPanel() { renderUsersTable(); renderReportsTable(); }
+
+  function renderUsersTable() {
+    $('usersTableBody').innerHTML = USERS.map((u) => {
+      const meta = ROLE_META[u.role] || ROLE_META.ed;
+      const statusBadge = u.active
+        ? '<span class="text-[11px] font-semibold text-emerald bg-emerald-pale px-2 py-0.5 rounded-full">Active</span>'
+        : '<span class="text-[11px] font-semibold text-ink-faint bg-canvas px-2 py-0.5 rounded-full">Inactive</span>';
+      return `<tr>
+        <td class="font-semibold">${u.fullName}</td>
+        <td class="text-xs">${u.email}</td>
+        <td>${meta.label}</td>
+        <td>${(u.reportAccess || []).length}${u.isAdmin ? ' (all)' : ''}</td>
+        <td>${statusBadge}</td>
+        <td><button data-edit-user="${u.id}" class="text-xs font-semibold text-ink hover:underline">Edit</button></td>
+      </tr>`;
+    }).join('');
+    document.querySelectorAll('[data-edit-user]').forEach((btn) => btn.addEventListener('click', () => openUserModal(btn.dataset.editUser)));
+  }
+
+  function fillReportAccessChecklist(container, checkedIds) {
+    container.innerHTML = REPORTS.map((r) => `
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" class="rounded report-access-chk" value="${r.id}" ${checkedIds.includes(r.id) ? 'checked' : ''} />
+        <span>${r.name} <span class="text-ink-faint text-xs">(${r.dept})</span></span>
+      </label>`).join('') || '<p class="text-xs text-ink-faint">No reports in the library yet.</p>';
+  }
+
+  function openUserModal(userId) {
+    const isEdit = !!userId;
+    const user = isEdit ? USERS.find((u) => u.id === userId) : null;
+    $('userModalTitle').textContent = isEdit ? 'Edit user' : 'Add user';
+    $('userFormId').value = isEdit ? user.id : '';
+    $('userFormName').value = isEdit ? user.fullName : '';
+    $('userFormEmail').value = isEdit ? user.email : '';
+    $('userFormEmail').disabled = isEdit;
+    $('userFormEmailNote').classList.toggle('hidden', !isEdit);
+    $('userFormRole').value = isEdit ? user.role : 'ed';
+    $('userFormActive').checked = isEdit ? user.active : true;
+    $('userFormCanUpload').checked = isEdit ? user.canUploadData : true;
+    $('userFormError').classList.add('hidden');
+    $('createPwNote').classList.toggle('hidden', isEdit);
+    $('resetPwRow').classList.toggle('hidden', !isEdit);
+    $('sendResetBtn').dataset.email = isEdit ? user.email : '';
+    $('deactivateUserBtn').classList.toggle('hidden', !isEdit);
+    $('deactivateUserBtn').dataset.userId = isEdit ? user.id : '';
+    $('userFormSubmitBtn').textContent = isEdit ? 'Save changes' : 'Create user & send invite';
+    fillReportAccessChecklist($('userFormReportAccess'), isEdit ? (user.reportAccess || []) : []);
+    openModal('userModal');
+  }
+
+  async function handleUserFormSubmit(e) {
+    e.preventDefault();
+    const id = $('userFormId').value;
+    const email = $('userFormEmail').value.trim();
+    const fullName = $('userFormName').value.trim();
+    const role = $('userFormRole').value;
+    const active = $('userFormActive').checked;
+    const canUploadData = $('userFormCanUpload').checked;
+    const reportAccess = Array.from(document.querySelectorAll('#userFormReportAccess .report-access-chk:checked')).map((c) => c.value);
+
+    if (!email || !fullName) { showFormError('userFormError', 'Name and email are required.'); return; }
+
+    const btn = $('userFormSubmitBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Saving...';
+
+    try {
+      if (id) {
+        const u = USERS.find((x) => x.id === id);
+        if (u.isAdmin && role !== 'gm_finance' && USERS.filter((x) => x.isAdmin && x.active).length <= 1) {
+          throw { code: 'guard', message: 'At least one active GM Finance admin account must remain.' };
+        }
+        if (u.isAdmin && !active && USERS.filter((x) => x.isAdmin && x.active).length <= 1) {
+          throw { code: 'guard', message: 'At least one active GM Finance admin account must remain.' };
+        }
+        await db.collection('users').doc(id).update({
+          fullName, role, active, canUploadData, isAdmin: role === 'gm_finance', reportAccess
+        });
+      } else {
+        const dup = USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+        if (dup) throw { code: 'guard', message: 'A user with that email already exists.' };
+
+        const tempPassword = genPassword();
+        const cred = await secondaryAuth.createUserWithEmailAndPassword(email, tempPassword);
+        const uid = cred.user.uid;
+        await db.collection('users').doc(uid).set({
+          fullName, email, role, isAdmin: role === 'gm_finance',
+          active, canUploadData, reportAccess,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        await secondaryAuth.sendPasswordResetEmail(email);
+        await secondaryAuth.signOut();
+      }
+      closeModal('userModal');
+      renderUsersTable();
+    } catch (err) {
+      console.error(err);
+      showFormError('userFormError', err.code === 'guard' ? err.message : friendlyAuthError(err));
+    }
+    btn.disabled = false; btn.textContent = originalText;
+  }
+
+  async function handleSendReset() {
+    const email = $('sendResetBtn').dataset.email;
+    if (!email) return;
+    try {
+      await auth.sendPasswordResetEmail(email);
+      $('sendResetBtn').innerHTML = '<i class="fa-solid fa-check mr-1.5"></i>Reset email sent';
+      setTimeout(() => { $('sendResetBtn').innerHTML = '<i class="fa-solid fa-key mr-1.5"></i>Send password reset email'; }, 3000);
+    } catch (err) {
+      showFormError('userFormError', friendlyAuthError(err));
+    }
+  }
+
+  async function handleDeactivateUser() {
+    const id = $('deactivateUserBtn').dataset.userId;
+    if (!id) return;
+    const target = USERS.find((u) => u.id === id);
+    if (target.isAdmin && USERS.filter((u) => u.isAdmin && u.active).length <= 1) {
+      showFormError('userFormError', 'At least one active GM Finance admin account must remain.');
+      return;
+    }
+    if (currentUser && currentUser.id === id) { showFormError('userFormError', 'You cannot deactivate the account you are currently signed in with.'); return; }
+    if (!confirm(`Deactivate ${target.fullName}? They will immediately lose access to the dashboard. This does not delete their sign-in account — do that from the Firebase console if needed.`)) return;
+    try {
+      await db.collection('users').doc(id).update({ active: false });
+      closeModal('userModal');
+      renderUsersTable();
+    } catch (err) {
+      showFormError('userFormError', friendlyAuthError(err));
+    }
+  }
+
+  /* --------------------------------------------------------------
+     4.11  ADMIN PANEL — Reports
+     -------------------------------------------------------------- */
+  function renderReportsTable() {
+    $('reportsTableBody').innerHTML = REPORTS.map((r) => {
+      const accessCount = USERS.filter((u) => u.isAdmin || (u.reportAccess || []).includes(r.id)).length;
+      const sourceTag = r.sourceType === 'uploaded'
+        ? '<span class="text-[11px] font-semibold text-navy bg-navy-pale px-2 py-0.5 rounded-full">Uploaded file</span>'
+        : '<span class="text-[11px] font-semibold text-ink-muted bg-canvas px-2 py-0.5 rounded-full">External URL</span>';
+      return `<tr>
+        <td class="font-semibold">${r.name}</td>
+        <td>${r.dept}</td>
+        <td>${sourceTag}</td>
+        <td>${formatAdded(r.uploadedAt)}</td>
+        <td>${accessCount}</td>
+        <td><button data-edit-report="${r.id}" class="text-xs font-semibold text-ink hover:underline">Edit</button></td>
+      </tr>`;
+    }).join('');
+    document.querySelectorAll('[data-edit-report]').forEach((btn) => btn.addEventListener('click', () => openReportModal(btn.dataset.editReport)));
+  }
+
+  function fillUserAccessChecklist(container, checkedUserIds) {
+    container.innerHTML = USERS.map((u) => `
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" class="rounded user-access-chk" value="${u.id}" ${checkedUserIds.includes(u.id) || u.isAdmin ? 'checked' : ''} ${u.isAdmin ? 'disabled' : ''} />
+        <span>${u.fullName} <span class="text-ink-faint text-xs">(${(ROLE_META[u.role] || ROLE_META.ed).label}${u.isAdmin ? ' — always has access' : ''})</span></span>
+      </label>`).join('');
+  }
+
+  function openReportModal(reportId) {
+    const isEdit = !!reportId;
+    const report = isEdit ? REPORTS.find((r) => r.id === reportId) : null;
+    $('reportModalTitle').textContent = isEdit ? 'Edit report' : 'Upload report';
+    $('reportFormId').value = isEdit ? report.id : '';
+    $('reportFormName').value = isEdit ? report.name : '';
+    $('reportFormDept').value = isEdit ? report.dept : 'Executive';
+    $('reportFormDesc').value = isEdit ? (report.description || '') : '';
+    $('reportFormSource').value = isEdit ? report.sourceType : 'upload';
+    $('reportFormUrl').value = isEdit && report.sourceType === 'url' ? report.url : '';
+    $('reportFormFile').value = '';
+    toggleReportSourceFields();
+    $('reportFormError').classList.add('hidden');
+    $('deleteReportBtn').classList.toggle('hidden', !isEdit);
+    $('deleteReportBtn').dataset.reportId = isEdit ? report.id : '';
+    $('reportFormSubmitBtn').textContent = 'Save report';
+
+    const usersWithAccess = isEdit ? USERS.filter((u) => (u.reportAccess || []).includes(report.id)).map((u) => u.id) : [];
+    fillUserAccessChecklist($('reportFormAccess'), usersWithAccess);
+    openModal('reportModal');
+  }
+
+  function toggleReportSourceFields() {
+    const isUpload = $('reportFormSource').value === 'upload';
+    $('reportFormFileWrap').classList.toggle('hidden', !isUpload);
+    $('reportFormUrlWrap').classList.toggle('hidden', isUpload);
+  }
+
+  async function handleReportFormSubmit(e) {
+    e.preventDefault();
+    const id = $('reportFormId').value;
+    const name = $('reportFormName').value.trim();
+    const dept = $('reportFormDept').value;
+    const description = $('reportFormDesc').value.trim();
+    const sourceType = $('reportFormSource').value;
+    const file = $('reportFormFile').files[0];
+    const url = $('reportFormUrl').value.trim();
+    const selectedUserIds = Array.from(document.querySelectorAll('#reportFormAccess .user-access-chk:checked')).map((c) => c.value);
+
+    if (!name) { showFormError('reportFormError', 'Report name is required.'); return; }
+    if (sourceType === 'url' && !url) { showFormError('reportFormError', 'Please provide a URL, or switch to file upload.'); return; }
+    if (sourceType === 'upload' && !file && !id) { showFormError('reportFormError', 'Please choose a PDF file to upload.'); return; }
+
+    const reportId = id || db.collection('reports').doc().id;
+    const existing = id ? REPORTS.find((r) => r.id === id) : null;
+
+    const btn = $('reportFormSubmitBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+
+    try {
+      if (sourceType === 'upload' && file) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Uploading...';
+        await storage.ref('reports/' + reportId).put(file, { contentType: 'application/pdf' });
+      }
+
+      const payload = {
+        name, dept, description, sourceType,
+        url: sourceType === 'url' ? url : firebase.firestore.FieldValue.delete(),
+        status: existing ? (existing.status || 'pending') : 'pending',
+        uploadedAt: existing ? existing.uploadedAt : firebase.firestore.FieldValue.serverTimestamp(),
+        uploadedBy: existing ? existing.uploadedBy : (currentUser ? currentUser.fullName : 'Unknown')
+      };
+
+      await db.collection('reports').doc(reportId).set(payload, { merge: true });
+
+      // Sync per-user access from the checklist
+      const batch = db.batch();
+      USERS.forEach((u) => {
+        const has = (u.reportAccess || []).includes(reportId);
+        const shouldHave = selectedUserIds.includes(u.id);
+        if (shouldHave && !has) batch.update(db.collection('users').doc(u.id), { reportAccess: firebase.firestore.FieldValue.arrayUnion(reportId) });
+        if (!shouldHave && has) batch.update(db.collection('users').doc(u.id), { reportAccess: firebase.firestore.FieldValue.arrayRemove(reportId) });
+      });
+      await batch.commit();
+
+      closeModal('reportModal');
+      renderReportsTable(); renderUsersTable();
+    } catch (err) {
+      console.error(err);
+      showFormError('reportFormError', err.message || 'Could not save this report. Check your connection and permissions.');
+    }
+    btn.disabled = false; btn.textContent = originalText;
+  }
+
+  async function handleDeleteReport() {
+    const id = $('deleteReportBtn').dataset.reportId;
+    if (!id) return;
+    const report = REPORTS.find((r) => r.id === id);
+    if (!confirm(`Delete "${report.name}"? This removes it for all users.`)) return;
+    try {
+      if (report.sourceType === 'uploaded') { try { await storage.ref('reports/' + id).delete(); } catch (e) { /* file may already be gone */ } }
+      await db.collection('reports').doc(id).delete();
+      const batch = db.batch();
+      USERS.forEach((u) => { if ((u.reportAccess || []).includes(id)) batch.update(db.collection('users').doc(u.id), { reportAccess: firebase.firestore.FieldValue.arrayRemove(id) }); });
+      await batch.commit();
+      closeModal('reportModal');
+      renderReportsTable(); renderUsersTable();
+    } catch (err) {
+      showFormError('reportFormError', err.message || 'Could not delete this report.');
+    }
+  }
+
+  function showFormError(id, msg) { const el = $(id); el.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i>${msg}`; el.classList.remove('hidden'); }
+
+  /* --------------------------------------------------------------
+     4.12  MODAL HELPERS
+     -------------------------------------------------------------- */
+  function openModal(id) { $(id).classList.add('open'); }
+  function closeModal(id) { $(id).classList.remove('open'); }
+
+  /* --------------------------------------------------------------
+     4.13  LOGOUT
+     -------------------------------------------------------------- */
+  function logout() {
+    auth.signOut();
+    sheetData = { headers: [], rows: [] };
+    filteredRows = [];
+  }
+
+  /* --------------------------------------------------------------
+     4.14  EVENT WIRING
+     -------------------------------------------------------------- */
+  function wireEvents() {
+    $('loginForm').addEventListener('submit', handleLoginSubmit);
+    $('forgotPwBtn').addEventListener('click', handleForgotPassword);
+    $('togglePw').addEventListener('click', () => {
+      const input = $('passwordInput'); const icon = $('togglePw').querySelector('i');
+      const show = input.type === 'password'; input.type = show ? 'text' : 'password';
+      icon.className = show ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+    });
+
+    $('logoutBtn').addEventListener('click', logout);
+    $('settingsLogoutBtn').addEventListener('click', logout);
+    $('selfResetPwBtn').addEventListener('click', async () => {
+      if (!currentUser) return;
+      try { await auth.sendPasswordResetEmail(currentUser.email); alert('Password reset link sent to ' + currentUser.email); }
+      catch (err) { alert(friendlyAuthError(err)); }
+    });
+
+    $('sidebarToggle').addEventListener('click', () => { $('sidebar').classList.add('open'); $('sidebarOverlay').classList.remove('hidden'); });
+    $('sidebarOverlay').addEventListener('click', closeMobileSidebar);
+
+    $('markReviewed').addEventListener('click', () => setReportStatus('reviewed'));
+    $('markPending').addEventListener('click', () => setReportStatus('pending'));
+    $('fullscreenBtn').addEventListener('click', () => { const f = $('pdfFrame'); if (f.requestFullscreen) f.requestFullscreen(); });
+
+    $('fileInput').addEventListener('change', (e) => { if (currentUser.canUploadData && e.target.files[0]) handleFile(e.target.files[0]); });
+    $('sampleDataBtn').addEventListener('click', () => { if (currentUser.canUploadData) loadSampleData(); else alert('Your account does not have permission to load data. Ask GM Finance to enable it.'); });
+    $('tableSearch').addEventListener('input', applyFilters);
+    $('colFilterSelect').addEventListener('change', applyFilters);
+    $('prevPage').addEventListener('click', () => { currentPage--; renderTable(); });
+    $('nextPage').addEventListener('click', () => { currentPage++; renderTable(); });
+    $('clearDataBtn').addEventListener('click', () => { if (confirm('Clear the currently loaded spreadsheet data?')) { sheetData = { headers: [], rows: [] }; filteredRows = []; renderDataEmptyState(); } });
+
+    document.querySelectorAll('.tab-btn').forEach((btn) => btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach((b) => b.dataset.active = 'false');
+      btn.dataset.active = 'true';
+      document.querySelectorAll('.tab-panel').forEach((p) => p.classList.add('hidden'));
+      $('tab-' + btn.dataset.tab).classList.remove('hidden');
+    }));
+
+    $('addUserBtn').addEventListener('click', () => openUserModal(null));
+    $('userForm').addEventListener('submit', handleUserFormSubmit);
+    $('deactivateUserBtn').addEventListener('click', handleDeactivateUser);
+    $('sendResetBtn').addEventListener('click', handleSendReset);
+
+    $('addReportBtn').addEventListener('click', () => openReportModal(null));
+    $('reportForm').addEventListener('submit', handleReportFormSubmit);
+    $('deleteReportBtn').addEventListener('click', handleDeleteReport);
+    $('reportFormSource').addEventListener('change', toggleReportSourceFields);
+
+    document.querySelectorAll('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => closeModal(btn.dataset.closeModal)));
+    document.querySelectorAll('.modal-overlay').forEach((ov) => ov.addEventListener('click', (e) => { if (e.target === ov) closeModal(ov.id); }));
+  }
+
+  wireEvents();
+})();
+</script>
+</body>
+</html>
