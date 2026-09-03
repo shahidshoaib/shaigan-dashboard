@@ -329,44 +329,51 @@
         <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div>
             <h1 class="text-xl sm:text-2xl font-bold">Data analysis</h1>
-            <p class="text-sm text-ink-muted mt-1">Upload a spreadsheet to extract KPIs and browse the data. This stays local to your session — not synced.</p>
+            <p class="text-sm text-ink-muted mt-1">Spreadsheet datasets, synced for everyone — upload once, filter and analyze from any device.</p>
           </div>
         </div>
 
-        <div id="uploadZone" class="bg-white border border-dashed border-line rounded-lg p-6 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-          <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-md bg-emerald-pale text-emerald flex items-center justify-center"><i class="fa-solid fa-file-arrow-up"></i></div>
-            <div>
-              <p class="text-sm font-semibold">Upload .xlsx, .xls or .csv</p>
-              <p class="text-xs text-ink-muted">Parsed locally in your browser — nothing is uploaded anywhere.</p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <button id="sampleDataBtn" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas">Load sample data</button>
-            <label for="fileInput" class="cursor-pointer text-xs font-semibold px-3 py-2 rounded-md bg-ink text-white hover:opacity-90">
-              <i class="fa-solid fa-upload mr-1.5"></i>Choose file
-            </label>
-            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+          <select id="datasetSelect" class="w-full sm:w-80 rounded-md border border-line bg-white px-3 py-2.5 text-sm"></select>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="uploadDatasetBtn" class="hidden text-xs font-semibold px-3 py-2 rounded-md bg-ink text-white hover:opacity-90"><i class="fa-solid fa-file-arrow-up mr-1.5"></i>Upload dataset</button>
+            <button id="deleteDatasetBtn" class="hidden text-xs font-semibold px-3 py-2 rounded-md border border-line text-burgundy hover:bg-canvas"><i class="fa-solid fa-trash mr-1.5"></i>Delete</button>
+            <button id="sampleDataBtn" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas">Preview sample data</button>
           </div>
         </div>
 
-        <div id="dataEmptyState" class="text-center py-16 text-ink-faint">
+        <div id="dataEmptyState" class="text-center py-16 text-ink-faint bg-white border border-line rounded-lg">
           <i class="fa-solid fa-table text-3xl mb-3"></i>
-          <p class="text-sm">No data loaded yet. Upload a file or load sample data to begin.</p>
+          <p class="text-sm">No datasets yet. Upload a spreadsheet to get started, or preview sample data.</p>
         </div>
 
         <div id="dataResults" class="hidden">
+          <p id="datasetMeta" class="text-xs text-ink-muted mb-4"></p>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" id="dataKpis"></div>
+
+          <div class="bg-white border border-line rounded-lg mb-4">
+            <button id="toggleFiltersBtn" class="w-full flex items-center justify-between px-4 py-3 text-sm font-bold">
+              <span><i class="fa-solid fa-filter mr-2 text-ink-faint"></i>Filters</span>
+              <span class="flex items-center gap-3">
+                <span id="activeFilterCount" class="hidden text-[11px] font-semibold text-emerald bg-emerald-pale px-2 py-0.5 rounded-full"></span>
+                <i id="filtersChevron" class="fa-solid fa-chevron-down text-ink-faint text-xs"></i>
+              </span>
+            </button>
+            <div id="filtersPanel" class="hidden border-t border-line px-4 py-4">
+              <div class="flex justify-end mb-3">
+                <button id="clearFiltersBtn" class="text-xs font-semibold text-ink-muted hover:text-ink hover:underline">Clear all filters</button>
+              </div>
+              <div id="filtersBody" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+          </div>
+
           <div class="bg-white border border-line rounded-lg overflow-hidden">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-line">
               <div class="relative w-full sm:w-72">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-ink-faint"></i>
-                <input id="tableSearch" type="text" placeholder="Search rows..." class="w-full rounded-md border border-line pl-8 pr-3 py-2 text-sm" />
+                <input id="tableSearch" type="text" placeholder="Quick search across all columns..." class="w-full rounded-md border border-line pl-8 pr-3 py-2 text-sm" />
               </div>
-              <div class="flex items-center gap-2">
-                <select id="colFilterSelect" class="rounded-md border border-line px-2.5 py-2 text-xs"></select>
-                <span class="text-xs text-ink-muted" id="rowCountLabel"></span>
-              </div>
+              <span class="text-xs text-ink-muted" id="rowCountLabel"></span>
             </div>
             <div class="data-table-wrap">
               <table class="data-table">
@@ -573,6 +580,35 @@
   </div>
 </div>
 
+<div id="datasetModal" class="modal-overlay fixed inset-0 z-50 items-center justify-center bg-black/40 p-4">
+  <div class="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+      <h3 class="text-sm font-bold">Upload dataset</h3>
+      <button data-close-modal="datasetModal" class="text-ink-faint hover:text-ink"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="datasetForm" class="px-5 py-4 space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Dataset name</label>
+        <input id="datasetFormName" type="text" required class="w-full rounded-md border border-line px-3 py-2 text-sm" placeholder="e.g. Q3 Project Tracker" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Description (optional)</label>
+        <textarea id="datasetFormDesc" rows="2" class="w-full rounded-md border border-line px-3 py-2 text-sm"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Spreadsheet file</label>
+        <input id="datasetFormFile" type="file" accept=".xlsx,.xls,.csv" required class="w-full text-sm border border-line rounded-md px-3 py-2" />
+        <p class="text-[11px] text-ink-faint mt-1">Parsed in your browser, then the extracted data is saved centrally so every user sees the same dataset.</p>
+      </div>
+      <p id="datasetFormError" class="hidden text-xs text-burgundy"><i class="fa-solid fa-circle-exclamation mr-1"></i></p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" data-close-modal="datasetModal" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas">Cancel</button>
+        <button type="submit" id="datasetFormSubmitBtn" class="text-xs font-semibold px-4 py-2 rounded-md bg-ink text-white hover:opacity-90">Upload & save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 
 <!-- ================================================================
      4. APPLICATION LOGIC
@@ -762,6 +798,8 @@
         if (currentUser.isAdmin) renderReportsTable();
       }
     }, (err) => console.error('reports listener error', err));
+
+    subscribeDatasets();
   }
 
   /* --------------------------------------------------------------
@@ -995,43 +1033,72 @@
   }
 
   /* --------------------------------------------------------------
-     4.9  DATA ANALYSIS (unchanged — local only, not synced)
+     4.9  DATA ANALYSIS — Firebase-synced datasets with per-column filters
      -------------------------------------------------------------- */
+  let DATASETS = [];
+  let activeDatasetId = null;
+  let isPreviewOnly = false;
+  let colModel = {};      // { colName: { kind:'numeric'|'categorical'|'text', values:[...], min, max } }
+  let filterState = {};   // { colName: { kind:'categorical', selected:Set }|{ kind:'numeric', min, max }|{ kind:'text', value } }
+
+  function subscribeDatasets() {
+    db.collection('datasets').orderBy('uploadedAt', 'desc').onSnapshot((snap) => {
+      DATASETS = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (currentUser) renderDatasetSelect();
+    }, (err) => console.error('datasets listener error', err));
+  }
+
   function renderDataEmptyState() {
+    const canUpload = !!(currentUser && currentUser.canUploadData);
+    $('uploadDatasetBtn').classList.toggle('hidden', !canUpload);
+    $('deleteDatasetBtn').classList.toggle('hidden', !(canUpload && activeDatasetId && !isPreviewOnly));
     const has = sheetData.rows.length > 0;
     $('dataEmptyState').classList.toggle('hidden', has);
     $('dataResults').classList.toggle('hidden', !has);
-    const canUpload = !!(currentUser && currentUser.canUploadData);
-    $('uploadZone').classList.toggle('opacity-50', !canUpload);
-    $('fileInput').disabled = !canUpload;
-    $('sampleDataBtn').textContent = canUpload ? 'Load sample data' : 'Load sample data (view only)';
   }
 
-  function handleFile(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        ingestRows(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
-      } catch (err) {
-        alert('Could not parse this file. Please check it is a valid .xlsx, .xls or .csv file.');
-        console.error(err);
-      }
-    };
-    reader.readAsArrayBuffer(file);
+  function renderDatasetSelect() {
+    const sel = $('datasetSelect');
+    const prev = sel.value;
+    sel.innerHTML = DATASETS.map((d) => `<option value="${d.id}">${d.name} (${d.rowCount || 0} rows)</option>`).join('')
+      || `<option value="">No datasets yet</option>`;
+    sel.onchange = () => { if (sel.value) loadDatasetById(sel.value); };
+    if (DATASETS.some((d) => d.id === prev)) sel.value = prev;
+    else if (DATASETS.length && !isPreviewOnly) loadDatasetById(DATASETS[0].id);
+    else if (!DATASETS.length) { sheetData = { headers: [], rows: [] }; activeDatasetId = null; renderDataEmptyState(); }
   }
 
-  function ingestRows(rows) {
-    if (!rows || rows.length === 0) { alert('No rows were found in this file.'); return; }
-    sheetData = { headers: Object.keys(rows[0]), rows };
-    filteredRows = rows.slice();
+  async function loadDatasetById(id) {
+    const meta = DATASETS.find((d) => d.id === id);
+    if (!meta) return;
+    isPreviewOnly = false;
+    activeDatasetId = id;
+    $('datasetSelect').value = id;
+    $('datasetMeta').textContent = `${meta.name} · uploaded by ${meta.uploadedBy || 'Unknown'} · ${formatAdded(meta.uploadedAt)}${meta.description ? ' — ' + meta.description : ''}`;
+    try {
+      const url = await storage.ref('datasets/' + id + '.json').getDownloadURL();
+      const res = await fetch(url);
+      const json = await res.json();
+      ingestRows(json.rows, json.headers);
+    } catch (err) {
+      console.error(err);
+      alert('Could not load this dataset. It may have failed to save correctly — try re-uploading it.');
+    }
+    renderDataEmptyState();
+  }
+
+  function ingestRows(rows, headersOverride) {
+    if (!rows || rows.length === 0) { alert('No rows were found.'); return; }
+    sheetData = { headers: headersOverride || Object.keys(rows[0]), rows };
+    buildFilterModel();
     currentPage = 1;
-    renderDataEmptyState(); renderDataKpis(); renderColumnFilter(); renderTable();
+    renderDataEmptyState(); renderDataKpis(); renderFiltersPanel(); applyFilters();
   }
 
   function loadSampleData() {
+    isPreviewOnly = true;
+    activeDatasetId = null;
+    $('datasetMeta').textContent = 'Preview only — not saved. Use "Upload dataset" to save real data for everyone.';
     ingestRows([
       { Project: 'Emerald Tower Fit-Out', Department: 'Operations', Budget: 185000, Spent: 142300, Priority: 'High', Status: 'On Track' },
       { Project: 'Q3 Compliance Review', Department: 'Finance', Budget: 42000, Spent: 39850, Priority: 'Medium', Status: 'On Track' },
@@ -1046,26 +1113,139 @@
     ]);
   }
 
-  function numericColumns() {
-    return sheetData.headers.filter((h) =>
-      sheetData.rows.every((r) => r[h] === '' || r[h] === null || !isNaN(parseFloat(r[h])))
-      && sheetData.rows.some((r) => r[h] !== '' && r[h] !== null)
-    );
+  /* --- Filter model: decide per column whether it's numeric / categorical / free text --- */
+  function buildFilterModel() {
+    colModel = {}; filterState = {};
+    sheetData.headers.forEach((h) => {
+      const vals = sheetData.rows.map((r) => r[h]).filter((v) => v !== '' && v !== null && v !== undefined);
+      const isNumeric = vals.length > 0 && vals.every((v) => !isNaN(parseFloat(v)) && isFinite(v));
+      if (isNumeric) {
+        const nums = vals.map((v) => parseFloat(v));
+        const min = Math.min(...nums), max = Math.max(...nums);
+        colModel[h] = { kind: 'numeric', min, max };
+        filterState[h] = { kind: 'numeric', min, max };
+      } else {
+        const distinct = Array.from(new Set(vals.map((v) => String(v)))).sort();
+        if (distinct.length > 0 && distinct.length <= 30) {
+          colModel[h] = { kind: 'categorical', values: distinct };
+          filterState[h] = { kind: 'categorical', selected: new Set(distinct) };
+        } else {
+          colModel[h] = { kind: 'text' };
+          filterState[h] = { kind: 'text', value: '' };
+        }
+      }
+    });
   }
-  function priorityFlagCount() {
+
+  function renderFiltersPanel() {
+    const body = $('filtersBody');
+    body.innerHTML = sheetData.headers.map((h) => {
+      const model = colModel[h];
+      if (model.kind === 'numeric') {
+        return `<div>
+          <label class="block text-xs font-semibold text-ink-muted mb-1.5">${h}</label>
+          <div class="flex items-center gap-2">
+            <input type="number" class="filter-numeric-min w-full rounded-md border border-line px-2 py-1.5 text-xs" data-col="${h}" placeholder="Min (${model.min})" />
+            <span class="text-ink-faint text-xs">to</span>
+            <input type="number" class="filter-numeric-max w-full rounded-md border border-line px-2 py-1.5 text-xs" data-col="${h}" placeholder="Max (${model.max})" />
+          </div>
+        </div>`;
+      }
+      if (model.kind === 'categorical') {
+        return `<div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-semibold text-ink-muted">${h}</label>
+            <div class="flex gap-2">
+              <button type="button" class="filter-select-all text-[10px] font-semibold text-ink-muted hover:text-ink" data-col="${h}">All</button>
+              <button type="button" class="filter-select-none text-[10px] font-semibold text-ink-muted hover:text-ink" data-col="${h}">None</button>
+            </div>
+          </div>
+          <div class="border border-line rounded-md p-2 max-h-32 overflow-y-auto space-y-1">
+            ${model.values.map((v) => `
+              <label class="flex items-center gap-2 text-xs">
+                <input type="checkbox" class="filter-categorical-chk rounded" data-col="${h}" value="${v}" checked />
+                <span class="truncate">${v}</span>
+              </label>`).join('')}
+          </div>
+        </div>`;
+      }
+      return `<div>
+        <label class="block text-xs font-semibold text-ink-muted mb-1.5">${h}</label>
+        <input type="text" class="filter-text w-full rounded-md border border-line px-2 py-1.5 text-xs" data-col="${h}" placeholder="Contains..." />
+      </div>`;
+    }).join('');
+
+    body.querySelectorAll('.filter-categorical-chk').forEach((chk) => chk.addEventListener('change', (e) => {
+      const col = e.target.dataset.col;
+      if (e.target.checked) filterState[col].selected.add(e.target.value);
+      else filterState[col].selected.delete(e.target.value);
+      applyFilters();
+    }));
+    body.querySelectorAll('.filter-select-all').forEach((btn) => btn.addEventListener('click', () => {
+      const col = btn.dataset.col;
+      filterState[col].selected = new Set(colModel[col].values);
+      renderFiltersPanel(); applyFilters();
+    }));
+    body.querySelectorAll('.filter-select-none').forEach((btn) => btn.addEventListener('click', () => {
+      const col = btn.dataset.col;
+      filterState[col].selected = new Set();
+      renderFiltersPanel(); applyFilters();
+    }));
+    body.querySelectorAll('.filter-numeric-min, .filter-numeric-max').forEach((inp) => inp.addEventListener('input', (e) => {
+      const col = e.target.dataset.col;
+      const isMin = e.target.classList.contains('filter-numeric-min');
+      const val = e.target.value === '' ? (isMin ? colModel[col].min : colModel[col].max) : parseFloat(e.target.value);
+      if (isMin) filterState[col].min = val; else filterState[col].max = val;
+      applyFilters();
+    }));
+    body.querySelectorAll('.filter-text').forEach((inp) => inp.addEventListener('input', (e) => {
+      filterState[e.target.dataset.col].value = e.target.value.toLowerCase();
+      applyFilters();
+    }));
+
+    updateActiveFilterCount();
+  }
+
+  function updateActiveFilterCount() {
+    let n = 0;
+    Object.entries(filterState).forEach(([col, f]) => {
+      if (f.kind === 'categorical' && f.selected.size < colModel[col].values.length) n++;
+      if (f.kind === 'numeric' && (f.min > colModel[col].min || f.max < colModel[col].max)) n++;
+      if (f.kind === 'text' && f.value) n++;
+    });
+    const badge = $('activeFilterCount');
+    badge.classList.toggle('hidden', n === 0);
+    badge.textContent = n + ' active';
+  }
+
+  function rowPassesFilters(row) {
+    return sheetData.headers.every((h) => {
+      const f = filterState[h];
+      const v = row[h];
+      if (f.kind === 'categorical') return v === '' || v == null || f.selected.has(String(v));
+      if (f.kind === 'numeric') { const n = parseFloat(v); return isNaN(n) || (n >= f.min && n <= f.max); }
+      if (f.kind === 'text') return !f.value || String(v).toLowerCase().includes(f.value);
+      return true;
+    });
+  }
+
+  function numericColumns() {
+    return sheetData.headers.filter((h) => colModel[h] && colModel[h].kind === 'numeric');
+  }
+  function priorityFlagCount(rows) {
     const flagCols = sheetData.headers.filter((h) => /priority|risk|status/i.test(h));
     if (flagCols.length === 0) return 0;
-    return sheetData.rows.filter((r) => flagCols.some((c) => /high|critical|urgent|at risk/i.test(String(r[c])))).length;
+    return rows.filter((r) => flagCols.some((c) => /high|critical|urgent|at risk/i.test(String(r[c])))).length;
   }
 
   function renderDataKpis() {
     const numCols = numericColumns().slice(0, 2);
     const acc = accentClasses[(ROLE_META[currentUser.role] || ROLE_META.ed).accent];
     const kpis = [
-      { label: 'Total rows', value: sheetData.rows.length, icon: 'fa-table-cells' },
+      { label: 'Rows shown', value: filteredRows.length + ' / ' + sheetData.rows.length, icon: 'fa-table-cells' },
       { label: 'Columns', value: sheetData.headers.length, icon: 'fa-columns' },
-      ...numCols.map((c) => ({ label: `Sum of ${c}`, value: sheetData.rows.reduce((s, r) => s + (parseFloat(r[c]) || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 }), icon: 'fa-calculator' })),
-      { label: 'High priority flags', value: priorityFlagCount(), icon: 'fa-flag' }
+      ...numCols.map((c) => ({ label: `Sum of ${c}`, value: filteredRows.reduce((s, r) => s + (parseFloat(r[c]) || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 }), icon: 'fa-calculator' })),
+      { label: 'High priority flags', value: priorityFlagCount(filteredRows), icon: 'fa-flag' }
     ].slice(0, 4);
     $('dataKpis').innerHTML = kpis.map((k) => `
       <div class="bg-white border border-line rounded-lg p-4">
@@ -1074,19 +1254,20 @@
         <p class="text-xs text-ink-muted mt-1.5">${k.label}</p>
       </div>`).join('');
   }
-  function renderColumnFilter() {
-    $('colFilterSelect').innerHTML = `<option value="__all__">All columns</option>` + sheetData.headers.map((h) => `<option value="${h}">${h}</option>`).join('');
-  }
+
   function applyFilters() {
     const term = $('tableSearch').value.trim().toLowerCase();
-    const col = $('colFilterSelect').value;
     filteredRows = sheetData.rows.filter((row) => {
+      if (!rowPassesFilters(row)) return false;
       if (!term) return true;
-      if (col === '__all__') return Object.values(row).some((v) => String(v).toLowerCase().includes(term));
-      return String(row[col]).toLowerCase().includes(term);
+      return Object.values(row).some((v) => String(v).toLowerCase().includes(term));
     });
-    currentPage = 1; renderTable();
+    currentPage = 1;
+    updateActiveFilterCount();
+    renderDataKpis();
+    renderTable();
   }
+
   function renderTable() {
     $('tableHeadRow').innerHTML = sheetData.headers.map((h) => `<th>${h}</th>`).join('');
     const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
@@ -1099,6 +1280,85 @@
     $('pageLabel').textContent = `Page ${currentPage} of ${totalPages}`;
     $('prevPage').disabled = currentPage <= 1;
     $('nextPage').disabled = currentPage >= totalPages;
+  }
+
+  function clearAllFilters() {
+    sheetData.headers.forEach((h) => {
+      const model = colModel[h];
+      if (model.kind === 'categorical') filterState[h].selected = new Set(model.values);
+      if (model.kind === 'numeric') { filterState[h].min = model.min; filterState[h].max = model.max; }
+      if (model.kind === 'text') filterState[h].value = '';
+    });
+    $('tableSearch').value = '';
+    renderFiltersPanel();
+    applyFilters();
+  }
+
+  /* --- Upload / delete datasets (Firebase Storage + Firestore) --- */
+  function handleDatasetFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+          if (!rows.length) { reject(new Error('No rows found in this file.')); return; }
+          resolve({ headers: Object.keys(rows[0]), rows });
+        } catch (err) { reject(err); }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function handleDatasetFormSubmit(e) {
+    e.preventDefault();
+    const name = $('datasetFormName').value.trim();
+    const description = $('datasetFormDesc').value.trim();
+    const file = $('datasetFormFile').files[0];
+    if (!name) { showFormError('datasetFormError', 'Dataset name is required.'); return; }
+    if (!file) { showFormError('datasetFormError', 'Please choose a spreadsheet file.'); return; }
+
+    const btn = $('datasetFormSubmitBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Parsing...';
+
+    try {
+      const { headers, rows } = await handleDatasetFile(file);
+      const id = db.collection('datasets').doc().id;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Saving...';
+      const blob = new Blob([JSON.stringify({ headers, rows })], { type: 'application/json' });
+      await storage.ref('datasets/' + id + '.json').put(blob, { contentType: 'application/json' });
+      await db.collection('datasets').doc(id).set({
+        name, description, rowCount: rows.length, columnCount: headers.length,
+        uploadedBy: currentUser.fullName,
+        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      closeModal('datasetModal');
+      $('datasetForm').reset();
+      loadDatasetById(id);
+    } catch (err) {
+      console.error(err);
+      showFormError('datasetFormError', err.message || 'Could not save this dataset. Check your connection and permissions.');
+    }
+    btn.disabled = false; btn.textContent = originalText;
+  }
+
+  async function handleDeleteDataset() {
+    if (!activeDatasetId) return;
+    const meta = DATASETS.find((d) => d.id === activeDatasetId);
+    if (!confirm(`Delete "${meta ? meta.name : 'this dataset'}"? This removes it for everyone.`)) return;
+    try {
+      await storage.ref('datasets/' + activeDatasetId + '.json').delete().catch(() => {});
+      await db.collection('datasets').doc(activeDatasetId).delete();
+      activeDatasetId = null;
+      sheetData = { headers: [], rows: [] };
+      renderDataEmptyState();
+    } catch (err) {
+      alert(err.message || 'Could not delete this dataset.');
+    }
   }
 
   /* --------------------------------------------------------------
@@ -1414,10 +1674,17 @@
     $('markPending').addEventListener('click', () => setReportStatus('pending'));
     $('fullscreenBtn').addEventListener('click', () => { const f = $('pdfFrame'); if (f.requestFullscreen) f.requestFullscreen(); });
 
-    $('fileInput').addEventListener('change', (e) => { if (currentUser.canUploadData && e.target.files[0]) handleFile(e.target.files[0]); });
-    $('sampleDataBtn').addEventListener('click', () => { if (currentUser.canUploadData) loadSampleData(); else alert('Your account does not have permission to load data. Ask GM Finance to enable it.'); });
+    $('sampleDataBtn').addEventListener('click', loadSampleData);
     $('tableSearch').addEventListener('input', applyFilters);
-    $('colFilterSelect').addEventListener('change', applyFilters);
+    $('uploadDatasetBtn').addEventListener('click', () => { $('datasetFormError').classList.add('hidden'); openModal('datasetModal'); });
+    $('datasetForm').addEventListener('submit', handleDatasetFormSubmit);
+    $('deleteDatasetBtn').addEventListener('click', handleDeleteDataset);
+    $('clearFiltersBtn').addEventListener('click', clearAllFilters);
+    $('toggleFiltersBtn').addEventListener('click', () => {
+      $('filtersPanel').classList.toggle('hidden');
+      $('filtersChevron').classList.toggle('fa-chevron-down');
+      $('filtersChevron').classList.toggle('fa-chevron-up');
+    });
     $('prevPage').addEventListener('click', () => { currentPage--; renderTable(); });
     $('nextPage').addEventListener('click', () => { currentPage++; renderTable(); });
     $('clearDataBtn').addEventListener('click', () => { if (confirm('Clear the currently loaded spreadsheet data?')) { sheetData = { headers: [], rows: [] }; filteredRows = []; renderDataEmptyState(); } });
