@@ -78,6 +78,11 @@
   .modal-overlay.open { display: flex; }
 
   .tab-btn[data-active="true"] { color: #171B19; border-color: #171B19; }
+  .postab-btn[data-active="true"] { color: #171B19; border-color: #171B19; }
+  table.pos-table th, table.pos-table td { padding: 0.45rem 0.6rem; }
+  table.pos-table input[type="text"] { font-size: 0.83rem; }
+  table.pos-table input:not(:disabled):hover { background: #FAFAF9; border-radius: 4px; }
+  table.pos-table input:not(:disabled):focus { outline: 1px solid #0B4F3F; border-radius: 4px; }
 
   #bootScreen { display: flex; }
   #bootScreen.hidden-boot { display: none; }
@@ -390,6 +395,216 @@
         </div>
       </section>
 
+      <!-- ---------- Position Reports (Bank / Impex / Payables — weekly) ---------- -->
+      <section id="section-position" class="app-section">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">Position reports</h1>
+            <p class="text-sm text-ink-muted mt-1">Bank, Impex and Payables/Receivables position — updated weekly.</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <select id="positionWeekSelect" class="rounded-md border border-line bg-white px-3 py-2 text-sm"></select>
+            <button id="positionNewWeekBtn" class="hidden text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-plus mr-1.5"></i>New week</button>
+            <button id="positionSaveBtn" class="hidden text-xs font-semibold px-3 py-2 rounded-md bg-ink text-white hover:opacity-90"><i class="fa-solid fa-floppy-disk mr-1.5"></i>Save week</button>
+            <span id="positionModeTag" class="text-[11px] font-semibold px-2.5 py-1.5 rounded-full"></span>
+          </div>
+        </div>
+
+        <div id="positionEmptyState" class="hidden text-center py-16 text-ink-faint bg-white border border-line rounded-lg">
+          <i class="fa-solid fa-building-columns text-3xl mb-3"></i>
+          <p class="text-sm">No position reports have been saved yet.</p>
+        </div>
+
+        <div id="positionBody" class="hidden">
+          <div class="flex items-center gap-1 border-b border-line mb-5">
+            <button class="postab-btn text-sm font-semibold px-4 py-2.5 border-b-2 border-transparent text-ink-muted" data-postab="summary" data-active="true">Summary</button>
+            <button class="postab-btn text-sm font-semibold px-4 py-2.5 border-b-2 border-transparent text-ink-muted" data-postab="bank">Bank position</button>
+            <button class="postab-btn text-sm font-semibold px-4 py-2.5 border-b-2 border-transparent text-ink-muted" data-postab="impex">Impex position</button>
+            <button class="postab-btn text-sm font-semibold px-4 py-2.5 border-b-2 border-transparent text-ink-muted" data-postab="payables">Payables &amp; receivables</button>
+          </div>
+
+          <div id="postab-summary" class="postab-panel">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+              <div class="bg-white border border-line rounded-lg p-4">
+                <p class="text-xs text-ink-muted">Replenishment %</p>
+                <div class="mt-1.5"><input data-table="meta" data-field="replenishPct" data-numeric="1" type="text" class="w-full text-lg font-bold border-0 p-0 focus:ring-0"></div>
+              </div>
+              <div class="bg-white border border-line rounded-lg p-4">
+                <p class="text-xs text-ink-muted">Pending cash inflow</p>
+                <div class="mt-1.5"><input data-table="meta" data-field="pendingInflow" data-numeric="1" type="text" class="w-full text-lg font-bold border-0 p-0 focus:ring-0"></div>
+              </div>
+              <div class="bg-white border border-line rounded-lg p-4">
+                <p class="text-xs text-ink-muted">Total accounts balance</p>
+                <p id="positionKpiTotalAccounts" class="text-lg font-bold mt-1.5">—</p>
+                <p class="text-[11px] text-ink-faint mt-0.5">Live from Bank tab</p>
+              </div>
+              <div class="bg-white border border-line rounded-lg p-4">
+                <p class="text-xs text-ink-muted">Total short-term liabilities</p>
+                <p id="positionKpiTotalLiabilities" class="text-lg font-bold mt-1.5">—</p>
+                <p class="text-[11px] text-ink-faint mt-0.5">Live from Payables tab (Subtotal A)</p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-sm font-bold">Other tracked items (not weekly-recurring)</h2>
+              <button id="positionOtherAddRow" class="hidden text-xs font-semibold px-3 py-1.5 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-plus mr-1.5"></i>Add item</button>
+            </div>
+            <div class="bg-white border border-line rounded-lg overflow-hidden">
+              <div class="data-table-wrap"><table class="data-table pos-table"><thead><tr><th>Item</th><th class="text-right">Opening</th><th class="text-right">Movement</th><th class="text-right">Closing</th><th>Remarks</th><th></th></tr></thead><tbody id="positionOtherBody"></tbody></table></div>
+            </div>
+          </div>
+
+          <div id="postab-bank" class="postab-panel hidden">
+            <div class="bg-white border border-line rounded-lg overflow-hidden">
+              <div class="data-table-wrap"><table class="data-table pos-table"><thead><tr><th>Entity</th><th>Bank account</th><th class="text-right">Opening</th><th class="text-right">Receipts (+)</th><th class="text-right">Payments (-)</th><th class="text-right">Closing balance</th><th class="text-right">Balance as of</th><th>Remarks</th><th></th></tr></thead><tbody id="positionBankBody"></tbody></table></div>
+            </div>
+            <button id="positionBankAddRow" class="hidden mt-3 text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-plus mr-1.5"></i>Add account row</button>
+          </div>
+
+          <div id="postab-impex" class="postab-panel hidden">
+            <div class="bg-white border border-line rounded-lg overflow-hidden">
+              <div class="data-table-wrap"><table class="data-table pos-table"><thead><tr><th>S#</th><th>LC item description</th><th>LC / BC number</th><th class="text-right">Value in FC</th><th>PAD month</th><th class="text-right">Amount outs. incl. duties</th><th></th></tr></thead><tbody id="positionImpexBody"></tbody></table></div>
+            </div>
+            <button id="positionImpexAddRow" class="hidden mt-3 text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-plus mr-1.5"></i>Add LC row</button>
+          </div>
+
+          <div id="postab-payables" class="postab-panel hidden">
+            <h3 class="text-xs font-bold text-ink-muted uppercase tracking-wide mb-2">Upcoming week's payments</h3>
+            <div class="bg-white border border-line rounded-lg overflow-hidden mb-2">
+              <div class="data-table-wrap"><table class="data-table pos-table"><thead><tr><th>Item</th><th class="text-right">Amount (PKR)</th><th>Notes</th><th></th></tr></thead><tbody id="positionUpcomingBody"></tbody>
+              <tfoot><tr class="font-bold bg-canvas"><td>Subtotal A</td><td class="text-right" id="posSubA">—</td><td colspan="2"></td></tr></tfoot></table></div>
+            </div>
+            <button id="positionUpcomingAddRow" class="hidden mb-6 text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-plus mr-1.5"></i>Add payment item</button>
+
+            <h3 class="text-xs font-bold text-ink-muted uppercase tracking-wide mb-2">Vendor payables (overdue &gt; 30 days)</h3>
+            <div class="bg-white border border-line rounded-lg overflow-hidden mb-2">
+              <div class="data-table-wrap"><table class="data-table pos-table"><thead><tr><th>Vendor</th><th class="text-right">Amount (PKR)</th><th>Notes</th><th></th></tr></thead><tbody id="positionOverdueBody"></tbody>
+              <tfoot>
+                <tr class="font-bold bg-canvas"><td>Overdue subtotal</td><td class="text-right" id="posSubOverdue">—</td><td colspan="2"></td></tr>
+                <tr><td>Payables not due but ready (B)</td><td class="text-right"><input data-table="meta" data-field="notDue" data-numeric="1" type="text" class="w-full text-right border-0 p-0 focus:ring-0"></td><td colspan="2"></td></tr>
+                <tr class="font-bold bg-canvas"><td>Total vendor payables</td><td class="text-right" id="posTotalVendor">—</td><td colspan="2"></td></tr>
+              </tfoot></table></div>
+            </div>
+            <button id="positionOverdueAddRow" class="hidden mb-6 text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-plus mr-1.5"></i>Add vendor</button>
+
+            <h3 class="text-xs font-bold text-ink-muted uppercase tracking-wide mb-2">Medium to long-term payables</h3>
+            <div class="bg-white border border-line rounded-lg overflow-hidden">
+              <table class="data-table pos-table"><tbody>
+                <tr><td>Provident Fund loan</td><td class="text-right"><input data-table="meta" data-field="pfLoan" data-numeric="1" type="text" class="w-full text-right border-0 p-0 focus:ring-0"></td></tr>
+                <tr class="font-bold bg-canvas"><td>Total medium/long-term payables (D)</td><td class="text-right" id="posTotalD">—</td></tr>
+              </tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Product Costing (live, with slicers) ---------- -->
+      <section id="section-costing" class="app-section">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">Product costing</h1>
+            <p class="text-sm text-ink-muted mt-1">Cost, MRP and net price merged by product code. Updates continuously.</p>
+          </div>
+        </div>
+
+        <div id="costingUploadRow" class="hidden grid sm:grid-cols-3 gap-3 mb-5">
+          <div class="bg-white border border-line rounded-lg p-4">
+            <p class="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">Cost file (master)</p>
+            <p class="text-[11px] text-ink-faint mb-2">Columns: Product Code, Cost, Type</p>
+            <input id="costingCostFile" type="file" accept=".xlsx,.xls,.csv" class="w-full text-xs border border-line rounded-md px-2 py-1.5" />
+            <p id="costingCostMeta" class="text-[11px] text-ink-faint mt-2">Not uploaded yet</p>
+          </div>
+          <div class="bg-white border border-line rounded-lg p-4">
+            <p class="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">MRP file</p>
+            <p class="text-[11px] text-ink-faint mb-2">Columns: Product Code, MRP</p>
+            <input id="costingMrpFile" type="file" accept=".xlsx,.xls,.csv" class="w-full text-xs border border-line rounded-md px-2 py-1.5" />
+            <p id="costingMrpMeta" class="text-[11px] text-ink-faint mt-2">Not uploaded yet</p>
+          </div>
+          <div class="bg-white border border-line rounded-lg p-4">
+            <p class="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">Net price file (Trading only)</p>
+            <p class="text-[11px] text-ink-faint mb-2">Columns: Product Code, Net Price</p>
+            <input id="costingNetFile" type="file" accept=".xlsx,.xls,.csv" class="w-full text-xs border border-line rounded-md px-2 py-1.5" />
+            <p id="costingNetMeta" class="text-[11px] text-ink-faint mt-2">Not uploaded yet</p>
+          </div>
+        </div>
+
+        <div id="costingEmptyState" class="hidden text-center py-16 text-ink-faint bg-white border border-line rounded-lg">
+          <i class="fa-solid fa-tags text-3xl mb-3"></i>
+          <p class="text-sm">No costing data yet. Upload the cost file to get started.</p>
+        </div>
+
+        <div id="costingResults" class="hidden">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5" id="costingKpis"></div>
+
+          <div class="bg-white border border-line rounded-lg mb-4 p-4">
+            <div class="flex flex-wrap items-end gap-4">
+              <div>
+                <label class="block text-[11px] font-semibold text-ink-muted uppercase tracking-wide mb-1">Product type</label>
+                <select id="costingTypeFilter" class="rounded-md border border-line bg-white px-3 py-2 text-sm"><option value="">All types</option></select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-ink-muted uppercase tracking-wide mb-1">Pricing status</label>
+                <select id="costingStatusFilter" class="rounded-md border border-line bg-white px-3 py-2 text-sm">
+                  <option value="">All statuses</option>
+                  <option value="complete">Complete</option>
+                  <option value="missing_mrp">Missing MRP</option>
+                  <option value="missing_net">Missing net price</option>
+                  <option value="orphan">Orphan (no cost match)</option>
+                </select>
+              </div>
+              <div class="flex-1 min-w-[200px]">
+                <label class="block text-[11px] font-semibold text-ink-muted uppercase tracking-wide mb-1">Search product</label>
+                <input id="costingSearch" type="text" placeholder="Product code or name..." class="w-full rounded-md border border-line px-3 py-2 text-sm" />
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-line rounded-lg overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+              <span class="text-xs text-ink-muted" id="costingRowCount"></span>
+              <span class="text-[11px] text-ink-faint" id="costingUpdatedAt"></span>
+            </div>
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr>
+                  <th>Product code</th><th>Type</th><th class="text-right">Cost</th><th class="text-right">MRP</th><th class="text-right">Margin</th><th class="text-right">Margin %</th><th class="text-right">Net price</th><th class="text-right">Net margin %</th><th>Status</th>
+                </tr></thead>
+                <tbody id="costingTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Marketing Report (monthly) ---------- -->
+      <section id="section-marketing" class="app-section">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">Marketing report</h1>
+            <p class="text-sm text-ink-muted mt-1">Monthly marketing summary archive.</p>
+          </div>
+          <button id="addMarketingBtn" class="hidden text-xs font-semibold px-3 py-2 rounded-md bg-ink text-white hover:opacity-90"><i class="fa-solid fa-file-circle-plus mr-1.5"></i>Upload month</button>
+        </div>
+
+        <div id="marketingEmptyState" class="hidden text-center py-16 text-ink-faint bg-white border border-line rounded-lg">
+          <i class="fa-solid fa-bullhorn text-3xl mb-3"></i>
+          <p class="text-sm">No marketing reports have been uploaded yet.</p>
+        </div>
+
+        <div id="marketingViewerWrap" class="hidden">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+            <select id="marketingMonthSelect" class="w-full sm:w-64 rounded-md border border-line bg-white px-3 py-2.5 text-sm"></select>
+            <button id="editMarketingBtn" class="hidden text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas"><i class="fa-solid fa-pen mr-1.5"></i>Edit / delete</button>
+          </div>
+          <div class="bg-white border border-line rounded-lg overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2.5 border-b border-line bg-canvas">
+              <p id="marketingMeta" class="text-xs text-ink-muted"></p>
+              <a id="marketingDownloadBtn" target="_blank" rel="noopener" class="text-xs font-semibold px-3 py-1.5 rounded-md border border-line bg-white hover:bg-canvas"><i class="fa-solid fa-download mr-1.5"></i>Download / Open</a>
+            </div>
+            <iframe id="marketingFrame" title="Marketing report viewer" class="w-full border-0 bg-white" style="height:68vh;"></iframe>
+          </div>
+        </div>
+      </section>
+
       <!-- ---------- Admin Panel (GM Finance only) ---------- -->
       <section id="section-admin" class="app-section">
         <div class="flex items-center justify-between flex-wrap gap-3 mb-5">
@@ -609,6 +824,45 @@
   </div>
 </div>
 
+<div id="marketingModal" class="modal-overlay fixed inset-0 z-50 items-center justify-center bg-black/40 p-4">
+  <div class="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+      <h3 id="marketingModalTitle" class="text-sm font-bold">Upload marketing report</h3>
+      <button data-close-modal="marketingModal" class="text-ink-faint hover:text-ink"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="marketingForm" class="px-5 py-4 space-y-4">
+      <input type="hidden" id="marketingFormId" />
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Month</label>
+        <input id="marketingFormMonth" type="month" required class="w-full rounded-md border border-line px-3 py-2 text-sm" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">Source</label>
+        <select id="marketingFormSource" class="w-full rounded-md border border-line px-3 py-2 text-sm">
+          <option value="uploaded">Upload PDF file</option>
+          <option value="url">Link to a hosted PDF</option>
+        </select>
+      </div>
+      <div id="marketingFormFileWrap">
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">PDF file</label>
+        <input id="marketingFormFile" type="file" accept="application/pdf" class="w-full text-sm border border-line rounded-md px-3 py-2" />
+      </div>
+      <div id="marketingFormUrlWrap" class="hidden">
+        <label class="block text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1.5">PDF URL</label>
+        <input id="marketingFormUrl" type="url" class="w-full rounded-md border border-line px-3 py-2 text-sm" placeholder="https://example.com/report.pdf" />
+      </div>
+      <p id="marketingFormError" class="hidden text-xs text-burgundy"><i class="fa-solid fa-circle-exclamation mr-1"></i></p>
+      <div class="flex items-center justify-between pt-2">
+        <button type="button" id="deleteMarketingBtn" class="hidden text-xs font-semibold text-burgundy hover:underline">Delete this month</button>
+        <div class="flex gap-2 ml-auto">
+          <button type="button" data-close-modal="marketingModal" class="text-xs font-semibold px-3 py-2 rounded-md border border-line hover:bg-canvas">Cancel</button>
+          <button type="submit" id="marketingFormSubmitBtn" class="text-xs font-semibold px-4 py-2 rounded-md bg-ink text-white hover:opacity-90">Save</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 
 <!-- ================================================================
      4. APPLICATION LOGIC
@@ -660,6 +914,9 @@
     { key: 'reports',   label: 'Report Archive', icon: 'fa-file-pdf' },
     { key: 'library',   label: 'Data Library', icon: 'fa-layer-group' },
     { key: 'data',      label: 'Data Analysis', icon: 'fa-table-list' },
+    { key: 'position',  label: 'Position Reports', icon: 'fa-building-columns' },
+    { key: 'costing',   label: 'Product Costing', icon: 'fa-tags' },
+    { key: 'marketing', label: 'Marketing Report', icon: 'fa-bullhorn' },
     { key: 'admin',     label: 'Admin Panel', icon: 'fa-user-shield', adminOnly: true },
     { key: 'settings',  label: 'Settings', icon: 'fa-gear' }
   ];
@@ -800,6 +1057,9 @@
     }, (err) => console.error('reports listener error', err));
 
     subscribeDatasets();
+    subscribePosition();
+    subscribeCosting();
+    subscribeMarketing();
   }
 
   /* --------------------------------------------------------------
@@ -859,6 +1119,9 @@
     if (key === 'dashboard') renderDashboard();
     if (key === 'admin') renderAdminPanel();
     if (key === 'library') renderDataLibrary();
+    if (key === 'position') renderPositionSection();
+    if (key === 'costing') renderCostingSection();
+    if (key === 'marketing') renderMarketingSection();
   }
 
   function closeMobileSidebar() { $('sidebar').classList.remove('open'); $('sidebarOverlay').classList.add('hidden'); }
@@ -1633,7 +1896,553 @@
   function showFormError(id, msg) { const el = $(id); el.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-1"></i>${msg}`; el.classList.remove('hidden'); }
 
   /* --------------------------------------------------------------
-     4.12  MODAL HELPERS
+     4.10  POSITION REPORTS — Bank / Impex / Payables, weekly
+     -------------------------------------------------------------- */
+  let POSITION_WEEKS = [];
+  let activePositionWeekId = null;
+  let positionData = null;
+  let positionIsNew = false;
+
+  function posFmt(n) {
+    if (n === '' || n === null || n === undefined || isNaN(n)) return '0';
+    return Math.round(Number(n)).toLocaleString('en-US');
+  }
+  function posParseNum(v) {
+    const n = parseFloat(String(v).replace(/,/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+  function canEditPosition() { return !!(currentUser && (currentUser.canUploadData || currentUser.isAdmin)); }
+
+  function blankPositionWeek() {
+    return {
+      summary: { replenishPct: 0, pendingInflow: 0 },
+      otherTracked: [{ item: '', opening: 0, movement: 0, closing: 0, remarks: '' }],
+      bank: [{ entity: 'SPPL', account: '', opening: 0, receipts: 0, payments: 0, balAsOf: 0, remarks: '' }],
+      impex: [{ sn: 1, desc: '', lc: '', fc: 0, month: 'AUGUST', amt: 0 }],
+      payables: { upcoming: [{ item: '', amt: 0, notes: '' }], vendorOverdue: [{ item: '', amt: 0, notes: '' }], notDue: 0, pfLoan: 0 }
+    };
+  }
+
+  function subscribePosition() {
+    db.collection('positionReports').orderBy(firebase.firestore.FieldPath.documentId(), 'desc').onSnapshot((snap) => {
+      POSITION_WEEKS = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (currentUser) renderPositionWeekSelect();
+    }, (err) => console.error('positionReports listener error', err));
+  }
+
+  function renderPositionWeekSelect() {
+    const sel = $('positionWeekSelect');
+    const prev = sel.value;
+    sel.innerHTML = POSITION_WEEKS.map((w) => `<option value="${w.id}">Week ending ${w.id}</option>`).join('');
+    const canEdit = canEditPosition();
+    $('positionNewWeekBtn').classList.toggle('hidden', !canEdit);
+    if (POSITION_WEEKS.some((w) => w.id === prev)) { sel.value = prev; loadPositionWeek(prev); }
+    else if (POSITION_WEEKS.length) { sel.value = POSITION_WEEKS[0].id; loadPositionWeek(POSITION_WEEKS[0].id); }
+    else { activePositionWeekId = null; positionData = null; renderPositionSection(); }
+  }
+
+  function loadPositionWeek(id) {
+    const w = POSITION_WEEKS.find((x) => x.id === id);
+    if (!w) return;
+    activePositionWeekId = id;
+    positionIsNew = false;
+    positionData = JSON.parse(JSON.stringify({ summary: w.summary, otherTracked: w.otherTracked, bank: w.bank, impex: w.impex, payables: w.payables }));
+    renderPositionSection();
+  }
+
+  function startNewPositionWeek() {
+    const suggested = new Date().toISOString().slice(0, 10);
+    const wd = prompt('Week ending date (YYYY-MM-DD):', suggested);
+    if (!wd) return;
+    const latest = POSITION_WEEKS[0];
+    positionData = latest
+      ? JSON.parse(JSON.stringify({ summary: latest.summary, otherTracked: latest.otherTracked, bank: latest.bank, impex: latest.impex, payables: latest.payables }))
+      : blankPositionWeek();
+    // carry closing balances forward as next week's opening, zero out the movement columns
+    positionData.bank.forEach((r) => { r.opening = r.opening + r.receipts - r.payments; r.receipts = 0; r.payments = 0; });
+    activePositionWeekId = wd;
+    positionIsNew = true;
+    renderPositionSection();
+  }
+
+  async function savePositionWeek() {
+    if (!activePositionWeekId || !positionData) return;
+    const btn = $('positionSaveBtn');
+    btn.disabled = true;
+    try {
+      await db.collection('positionReports').doc(activePositionWeekId).set({
+        ...positionData,
+        savedBy: currentUser.fullName,
+        savedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      positionIsNew = false;
+    } catch (err) {
+      console.error(err);
+      alert('Could not save this week. Check your connection and try again.');
+    }
+    btn.disabled = false;
+  }
+
+  function renderPositionSection() {
+    if (!currentUser) return;
+    const has = !!positionData;
+    $('positionEmptyState').classList.toggle('hidden', has);
+    $('positionBody').classList.toggle('hidden', !has);
+    const canEdit = canEditPosition();
+    $('positionSaveBtn').classList.toggle('hidden', !(has && canEdit));
+    $('positionNewWeekBtn').classList.toggle('hidden', !canEdit);
+    ['positionOtherAddRow', 'positionBankAddRow', 'positionImpexAddRow', 'positionUpcomingAddRow', 'positionOverdueAddRow'].forEach((id) => $(id).classList.toggle('hidden', !canEdit));
+    const tag = $('positionModeTag');
+    if (!has) { tag.textContent = ''; return; }
+    if (canEdit) { tag.textContent = positionIsNew ? 'NEW WEEK — UNSAVED' : 'EDIT MODE'; tag.className = 'text-[11px] font-semibold px-2.5 py-1.5 rounded-full text-emerald bg-emerald-pale'; }
+    else { tag.textContent = 'READ-ONLY'; tag.className = 'text-[11px] font-semibold px-2.5 py-1.5 rounded-full text-navy bg-navy-pale'; }
+
+    renderPositionOther(); renderPositionBank(); renderPositionImpex(); renderPositionPayables();
+    document.querySelector('[data-table="meta"][data-field="replenishPct"]').value = posFmt(positionData.summary.replenishPct);
+    document.querySelector('[data-table="meta"][data-field="pendingInflow"]').value = posFmt(positionData.summary.pendingInflow);
+    document.querySelector('[data-table="meta"][data-field="notDue"]').value = posFmt(positionData.payables.notDue);
+    document.querySelector('[data-table="meta"][data-field="pfLoan"]').value = posFmt(positionData.payables.pfLoan);
+    setInputsDisabled(!canEdit);
+    recalcPositionTotals();
+  }
+
+  function setInputsDisabled(disabled) {
+    document.querySelectorAll('#positionBody input, #positionBody select').forEach((el) => { el.disabled = disabled; });
+    document.querySelectorAll('#positionBody [data-remove], #positionBody [id$="AddRow"]').forEach((el) => { el.classList.toggle('hidden', disabled); });
+  }
+
+  const posEntityOptions = ['SPPL', 'HC', 'Trading', 'Aesthetic', 'Univet', 'Lifeserve', 'Personal'];
+  const posMonthOptions = ['AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY'];
+
+  function posText(table, row, field, value) { return `<input type="text" data-table="${table}" data-row="${row}" data-field="${field}" value="${value || ''}">`; }
+  function posNum(table, row, field, value) { return `<input type="text" inputmode="decimal" data-numeric="1" data-table="${table}" data-row="${row}" data-field="${field}" value="${posFmt(value)}">`; }
+  function posSelect(table, row, field, value, options) {
+    return `<select data-table="${table}" data-row="${row}" data-field="${field}">` + options.map((o) => `<option value="${o}" ${o === value ? 'selected' : ''}>${o}</option>`).join('') + `</select>`;
+  }
+  function posRemoveBtn(table, row) { return `<button data-remove="${table}" data-row="${row}" class="text-ink-faint hover:text-burgundy" title="Remove row"><i class="fa-solid fa-trash text-xs"></i></button>`; }
+
+  function renderPositionOther() {
+    $('positionOtherBody').innerHTML = positionData.otherTracked.map((r, i) => `
+      <tr>
+        <td>${posText('other', i, 'item', r.item)}</td>
+        <td class="text-right">${posNum('other', i, 'opening', r.opening)}</td>
+        <td class="text-right">${posNum('other', i, 'movement', r.movement)}</td>
+        <td class="text-right">${posNum('other', i, 'closing', r.closing)}</td>
+        <td>${posText('other', i, 'remarks', r.remarks)}</td>
+        <td>${posRemoveBtn('other', i)}</td>
+      </tr>`).join('');
+  }
+
+  function renderPositionBank() {
+    $('positionBankBody').innerHTML = positionData.bank.map((r, i) => `
+      <tr>
+        <td>${posSelect('bank', i, 'entity', r.entity, posEntityOptions)}</td>
+        <td>${posText('bank', i, 'account', r.account)}</td>
+        <td class="text-right">${posNum('bank', i, 'opening', r.opening)}</td>
+        <td class="text-right">${posNum('bank', i, 'receipts', r.receipts)}</td>
+        <td class="text-right">${posNum('bank', i, 'payments', r.payments)}</td>
+        <td class="text-right"><span data-computed="bankClosing" data-row="${i}">${posFmt(r.opening + r.receipts - r.payments)}</span></td>
+        <td class="text-right">${posNum('bank', i, 'balAsOf', r.balAsOf)}</td>
+        <td>${posText('bank', i, 'remarks', r.remarks)}</td>
+        <td>${posRemoveBtn('bank', i)}</td>
+      </tr>`).join('') +
+      `<tr class="font-bold bg-canvas"><td colspan="2">Subtotal</td><td class="text-right" id="posBankSubO">—</td><td class="text-right" id="posBankSubR">—</td><td class="text-right" id="posBankSubP">—</td><td class="text-right" id="posBankSubC">—</td><td class="text-right" id="posBankSubB">—</td><td colspan="2"></td></tr>`;
+  }
+
+  function renderPositionImpex() {
+    $('positionImpexBody').innerHTML = positionData.impex.map((r, i) => `
+      <tr>
+        <td>${posNum('impex', i, 'sn', r.sn)}</td>
+        <td>${posText('impex', i, 'desc', r.desc)}</td>
+        <td>${posText('impex', i, 'lc', r.lc)}</td>
+        <td class="text-right">${posNum('impex', i, 'fc', r.fc)}</td>
+        <td>${posSelect('impex', i, 'month', r.month, posMonthOptions)}</td>
+        <td class="text-right">${posNum('impex', i, 'amt', r.amt)}</td>
+        <td>${posRemoveBtn('impex', i)}</td>
+      </tr>`).join('') +
+      `<tr class="font-bold bg-canvas"><td colspan="3">Total</td><td class="text-right" id="posImpexSubFc">—</td><td></td><td class="text-right" id="posImpexSubAmt">—</td><td></td></tr>`;
+  }
+
+  function renderPositionPayables() {
+    $('positionUpcomingBody').innerHTML = positionData.payables.upcoming.map((r, i) => `
+      <tr>
+        <td>${posText('upcoming', i, 'item', r.item)}</td>
+        <td class="text-right">${posNum('upcoming', i, 'amt', r.amt)}</td>
+        <td>${posText('upcoming', i, 'notes', r.notes)}</td>
+        <td>${posRemoveBtn('upcoming', i)}</td>
+      </tr>`).join('');
+    $('positionOverdueBody').innerHTML = positionData.payables.vendorOverdue.map((r, i) => `
+      <tr>
+        <td>${posText('vendorOverdue', i, 'item', r.item)}</td>
+        <td class="text-right">${posNum('vendorOverdue', i, 'amt', r.amt)}</td>
+        <td>${posText('vendorOverdue', i, 'notes', r.notes)}</td>
+        <td>${posRemoveBtn('vendorOverdue', i)}</td>
+      </tr>`).join('');
+  }
+
+  function recalcPositionTotals() {
+    if (!positionData) return;
+    let subO = 0, subR = 0, subP = 0, subC = 0, subB = 0;
+    positionData.bank.forEach((r, i) => {
+      const c = r.opening + r.receipts - r.payments;
+      const el = document.querySelector(`[data-computed="bankClosing"][data-row="${i}"]`);
+      if (el) el.textContent = posFmt(c);
+      subO += r.opening; subR += r.receipts; subP += r.payments; subC += c; subB += r.balAsOf;
+    });
+    setPosText('posBankSubO', subO); setPosText('posBankSubR', subR); setPosText('posBankSubP', subP);
+    setPosText('posBankSubC', subC); setPosText('posBankSubB', subB);
+
+    let sFc = 0, sAmt = 0;
+    positionData.impex.forEach((r) => { sFc += r.fc; sAmt += r.amt; });
+    setPosText('posImpexSubFc', sFc); setPosText('posImpexSubAmt', sAmt);
+
+    let subA = 0; positionData.payables.upcoming.forEach((r) => { subA += r.amt; });
+    let subOverdue = 0; positionData.payables.vendorOverdue.forEach((r) => { subOverdue += r.amt; });
+    const totalVendor = subOverdue + positionData.payables.notDue;
+    setPosText('posSubA', subA); setPosText('posSubOverdue', subOverdue);
+    setPosText('posTotalVendor', totalVendor); setPosText('posTotalD', positionData.payables.pfLoan);
+
+    setPosText('positionKpiTotalAccounts', subB);
+    setPosText('positionKpiTotalLiabilities', subA);
+  }
+  function setPosText(id, val) { const el = $(id); if (el) el.textContent = posFmt(val); }
+
+  function handlePositionInput(e) {
+    const t = e.target;
+    if (!t.dataset.table) return;
+    const table = t.dataset.table, row = +t.dataset.row, field = t.dataset.field;
+    const val = t.dataset.numeric === '1' ? posParseNum(t.value) : t.value;
+    if (table === 'bank') positionData.bank[row][field] = val;
+    else if (table === 'impex') positionData.impex[row][field] = val;
+    else if (table === 'upcoming') positionData.payables.upcoming[row][field] = val;
+    else if (table === 'vendorOverdue') positionData.payables.vendorOverdue[row][field] = val;
+    else if (table === 'other') positionData.otherTracked[row][field] = val;
+    else if (table === 'meta') {
+      if (field === 'notDue') positionData.payables.notDue = val;
+      else if (field === 'pfLoan') positionData.payables.pfLoan = val;
+      else if (field === 'replenishPct') positionData.summary.replenishPct = val;
+      else if (field === 'pendingInflow') positionData.summary.pendingInflow = val;
+    }
+    recalcPositionTotals();
+  }
+
+  function handlePositionRemove(e) {
+    const btn = e.target.closest('[data-remove]');
+    if (!btn) return;
+    const table = btn.dataset.remove, row = +btn.dataset.row;
+    if (table === 'bank') { positionData.bank.splice(row, 1); renderPositionBank(); }
+    else if (table === 'impex') { positionData.impex.splice(row, 1); renderPositionImpex(); }
+    else if (table === 'upcoming') { positionData.payables.upcoming.splice(row, 1); renderPositionPayables(); }
+    else if (table === 'vendorOverdue') { positionData.payables.vendorOverdue.splice(row, 1); renderPositionPayables(); }
+    else if (table === 'other') { positionData.otherTracked.splice(row, 1); renderPositionOther(); }
+    recalcPositionTotals();
+  }
+
+  /* --------------------------------------------------------------
+     4.11  PRODUCT COSTING — cost / MRP / net price merged by product code
+     -------------------------------------------------------------- */
+  let COSTING_DOC = null;   // { products, costUpdatedAt, mrpUpdatedAt, netUpdatedAt, ... }
+  let costingFiltered = [];
+
+  function subscribeCosting() {
+    db.collection('productCosting').doc('current').onSnapshot((doc) => {
+      COSTING_DOC = doc.exists ? doc.data() : null;
+      if (currentUser) renderCostingSection();
+    }, (err) => console.error('productCosting listener error', err));
+  }
+
+  function readSheetAsRows(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          resolve(XLSX.utils.sheet_to_json(ws, { defval: '' }));
+        } catch (err) { reject(err); }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function findKey(row, candidates) {
+    const keys = Object.keys(row);
+    for (const c of candidates) {
+      const hit = keys.find((k) => k.trim().toLowerCase() === c.toLowerCase());
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  async function handleCostingUpload(kind, file) {
+    if (!file) return;
+    try {
+      const rows = await readSheetAsRows(file);
+      if (!rows.length) { alert('No rows found in that file.'); return; }
+      const codeKey = findKey(rows[0], ['Product Code', 'Product ID', 'Code']);
+      if (!codeKey) { alert('Could not find a "Product Code" column in that file.'); return; }
+
+      let products = (COSTING_DOC && COSTING_DOC.products) ? JSON.parse(JSON.stringify(COSTING_DOC.products)) : [];
+      const byCode = {}; products.forEach((p) => { byCode[p.code] = p; });
+
+      if (kind === 'cost') {
+        const costKey = findKey(rows[0], ['Cost']);
+        const typeKey = findKey(rows[0], ['Type', 'Product Type', 'Tag']);
+        products = rows.map((r) => ({
+          code: String(r[codeKey]).trim(),
+          name: r[findKey(r, ['Product Name', 'Name'])] || '',
+          cost: parseFloat(r[costKey]) || 0,
+          type: (typeKey ? String(r[typeKey]).trim() : '') || 'Trading',
+          mrp: byCode[String(r[codeKey]).trim()] ? byCode[String(r[codeKey]).trim()].mrp : null,
+          netPrice: byCode[String(r[codeKey]).trim()] ? byCode[String(r[codeKey]).trim()].netPrice : null
+        }));
+      } else if (kind === 'mrp') {
+        const mrpKey = findKey(rows[0], ['MRP']);
+        rows.forEach((r) => {
+          const code = String(r[codeKey]).trim();
+          if (byCode[code]) byCode[code].mrp = parseFloat(r[mrpKey]) || 0;
+        });
+      } else if (kind === 'net') {
+        const netKey = findKey(rows[0], ['Net Price', 'Net']);
+        rows.forEach((r) => {
+          const code = String(r[codeKey]).trim();
+          if (byCode[code]) byCode[code].netPrice = parseFloat(r[netKey]) || 0;
+        });
+      }
+
+      const now = firebase.firestore.FieldValue.serverTimestamp();
+      const payload = { products, updatedBy: currentUser.fullName };
+      if (kind === 'cost') payload.costUpdatedAt = now;
+      if (kind === 'mrp') payload.mrpUpdatedAt = now;
+      if (kind === 'net') payload.netUpdatedAt = now;
+      await db.collection('productCosting').doc('current').set(payload, { merge: true });
+    } catch (err) {
+      console.error(err);
+      alert('Could not process that file. Check the column headers and try again.');
+    }
+  }
+
+  function computeCostingRow(p) {
+    const hasMrp = p.mrp !== null && p.mrp !== undefined;
+    const hasNet = p.netPrice !== null && p.netPrice !== undefined;
+    const isTrading = (p.type || '').toLowerCase() === 'trading';
+    const margin = hasMrp ? p.mrp - p.cost : null;
+    const marginPct = hasMrp && p.cost ? (margin / p.cost) * 100 : null;
+    const netMarginPct = (isTrading && hasNet && p.cost) ? ((p.netPrice - p.cost) / p.cost) * 100 : null;
+    let status = 'complete';
+    if (!hasMrp) status = 'missing_mrp';
+    else if (isTrading && !hasNet) status = 'missing_net';
+    return { ...p, margin, marginPct, netMarginPct, status, isTrading };
+  }
+
+  function renderCostingSection() {
+    if (!currentUser) return;
+    const canEdit = canEditPosition();
+    $('costingUploadRow').classList.toggle('hidden', !canEdit);
+    const products = (COSTING_DOC && COSTING_DOC.products) || [];
+    const has = products.length > 0;
+    $('costingEmptyState').classList.toggle('hidden', has);
+    $('costingResults').classList.toggle('hidden', !has);
+    if (COSTING_DOC) {
+      $('costingCostMeta').textContent = COSTING_DOC.costUpdatedAt ? 'Updated ' + formatAdded(COSTING_DOC.costUpdatedAt) : 'Not uploaded yet';
+      $('costingMrpMeta').textContent = COSTING_DOC.mrpUpdatedAt ? 'Updated ' + formatAdded(COSTING_DOC.mrpUpdatedAt) : 'Not uploaded yet';
+      $('costingNetMeta').textContent = COSTING_DOC.netUpdatedAt ? 'Updated ' + formatAdded(COSTING_DOC.netUpdatedAt) : 'Not uploaded yet';
+      $('costingUpdatedAt').textContent = COSTING_DOC.costUpdatedAt ? 'Cost file updated ' + formatAdded(COSTING_DOC.costUpdatedAt) : '';
+    }
+    if (!has) return;
+
+    const computed = products.map(computeCostingRow);
+    const types = Array.from(new Set(computed.map((p) => p.type).filter(Boolean)));
+    const typeSel = $('costingTypeFilter');
+    const prevType = typeSel.value;
+    typeSel.innerHTML = '<option value="">All types</option>' + types.map((t) => `<option value="${t}">${t}</option>`).join('');
+    typeSel.value = types.includes(prevType) ? prevType : '';
+
+    const kpis = [
+      { label: 'Products tracked', value: computed.length, icon: 'fa-tags' },
+      { label: 'Missing MRP', value: computed.filter((p) => p.status === 'missing_mrp').length, icon: 'fa-triangle-exclamation' },
+      { label: 'Missing net price', value: computed.filter((p) => p.status === 'missing_net').length, icon: 'fa-triangle-exclamation' },
+      { label: 'Avg margin %', value: (() => { const m = computed.filter((p) => p.marginPct !== null); return m.length ? (m.reduce((s, p) => s + p.marginPct, 0) / m.length).toFixed(1) + '%' : '—'; })(), icon: 'fa-chart-line' }
+    ];
+    $('costingKpis').innerHTML = kpis.map((k) => `
+      <div class="bg-white border border-line rounded-lg p-4">
+        <div class="w-8 h-8 rounded-md bg-emerald-pale text-emerald flex items-center justify-center mb-3"><i class="fa-solid ${k.icon} text-xs"></i></div>
+        <p class="text-2xl font-bold leading-none">${k.value}</p>
+        <p class="text-xs text-ink-muted mt-1.5">${k.label}</p>
+      </div>`).join('');
+
+    applyCostingFilters(computed);
+  }
+
+  function applyCostingFilters(computedInput) {
+    const computed = computedInput || ((COSTING_DOC && COSTING_DOC.products) || []).map(computeCostingRow);
+    const type = $('costingTypeFilter').value;
+    const status = $('costingStatusFilter').value;
+    const q = $('costingSearch').value.trim().toLowerCase();
+    costingFiltered = computed.filter((p) => {
+      if (type && p.type !== type) return false;
+      if (status && p.status !== status) return false;
+      if (q && !(p.code.toLowerCase().includes(q) || (p.name || '').toLowerCase().includes(q))) return false;
+      return true;
+    });
+    renderCostingTable();
+  }
+
+  function costingStatusBadge(s) {
+    const map = {
+      complete: ['Complete', 'text-emerald bg-emerald-pale'],
+      missing_mrp: ['Missing MRP', 'text-burgundy bg-burgundy-pale'],
+      missing_net: ['Missing net price', 'text-gold bg-gold-pale'],
+      orphan: ['Orphan', 'text-navy bg-navy-pale']
+    };
+    const [label, cls] = map[s] || map.complete;
+    return `<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${cls}">${label}</span>`;
+  }
+
+  function renderCostingTable() {
+    $('costingRowCount').textContent = `${costingFiltered.length} product${costingFiltered.length === 1 ? '' : 's'}`;
+    $('costingTableBody').innerHTML = costingFiltered.map((p) => `
+      <tr>
+        <td class="font-semibold">${p.code}${p.name ? '<div class="text-ink-faint font-normal">' + p.name + '</div>' : ''}</td>
+        <td>${p.type || '—'}</td>
+        <td class="text-right">${posFmt(p.cost)}</td>
+        <td class="text-right">${p.mrp !== null && p.mrp !== undefined ? posFmt(p.mrp) : '<span class="text-ink-faint">—</span>'}</td>
+        <td class="text-right">${p.margin !== null ? posFmt(p.margin) : '<span class="text-ink-faint">—</span>'}</td>
+        <td class="text-right">${p.marginPct !== null ? p.marginPct.toFixed(1) + '%' : '<span class="text-ink-faint">—</span>'}</td>
+        <td class="text-right">${p.isTrading ? (p.netPrice !== null && p.netPrice !== undefined ? posFmt(p.netPrice) : '<span class="text-ink-faint">—</span>') : '<span class="text-ink-faint">n/a</span>'}</td>
+        <td class="text-right">${p.netMarginPct !== null ? p.netMarginPct.toFixed(1) + '%' : '<span class="text-ink-faint">—</span>'}</td>
+        <td>${costingStatusBadge(p.status)}</td>
+      </tr>`).join('') || `<tr><td colspan="9" class="text-center text-ink-faint py-8">No products match these filters.</td></tr>`;
+  }
+
+  /* --------------------------------------------------------------
+     4.12  MARKETING REPORT — monthly PDF archive
+     -------------------------------------------------------------- */
+  let MARKETING_REPORTS = [];
+  let activeMarketingId = null;
+
+  function subscribeMarketing() {
+    db.collection('marketingReports').orderBy('month', 'desc').onSnapshot((snap) => {
+      MARKETING_REPORTS = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (currentUser) renderMarketingSection();
+    }, (err) => console.error('marketingReports listener error', err));
+  }
+
+  function renderMarketingSection() {
+    if (!currentUser) return;
+    const canEdit = canEditPosition();
+    $('addMarketingBtn').classList.toggle('hidden', !canEdit);
+    const has = MARKETING_REPORTS.length > 0;
+    $('marketingEmptyState').classList.toggle('hidden', has);
+    $('marketingViewerWrap').classList.toggle('hidden', !has);
+    if (!has) return;
+
+    const sel = $('marketingMonthSelect');
+    const prev = sel.value;
+    sel.innerHTML = MARKETING_REPORTS.map((m) => `<option value="${m.id}">${monthLabel(m.month)}</option>`).join('');
+    sel.onchange = () => loadMarketingReport(sel.value);
+    const stillValid = MARKETING_REPORTS.some((m) => m.id === prev);
+    loadMarketingReport(stillValid ? prev : MARKETING_REPORTS[0].id);
+    $('editMarketingBtn').classList.toggle('hidden', !canEdit);
+  }
+
+  function monthLabel(m) {
+    if (!m) return '';
+    const [y, mo] = m.split('-');
+    return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+  }
+
+  async function loadMarketingReport(id) {
+    const report = MARKETING_REPORTS.find((m) => m.id === id);
+    if (!report) return;
+    activeMarketingId = report.id;
+    $('marketingMonthSelect').value = report.id;
+    $('marketingMeta').textContent = monthLabel(report.month);
+    $('marketingFrame').src = 'about:blank';
+    if (report.sourceType === 'uploaded') {
+      try {
+        const url = await storage.ref('marketingReports/' + report.id).getDownloadURL();
+        $('marketingFrame').src = url;
+        $('marketingDownloadBtn').href = url;
+      } catch (err) { console.error(err); }
+    } else {
+      $('marketingFrame').src = report.url;
+      $('marketingDownloadBtn').href = report.url;
+    }
+    $('editMarketingBtn').onclick = () => openMarketingModal(report);
+  }
+
+  function toggleMarketingSourceFields() {
+    const isUpload = $('marketingFormSource').value === 'uploaded';
+    $('marketingFormFileWrap').classList.toggle('hidden', !isUpload);
+    $('marketingFormUrlWrap').classList.toggle('hidden', isUpload);
+  }
+
+  function openMarketingModal(report) {
+    $('marketingFormError').classList.add('hidden');
+    $('marketingForm').reset();
+    if (report) {
+      $('marketingModalTitle').textContent = 'Edit ' + monthLabel(report.month);
+      $('marketingFormId').value = report.id;
+      $('marketingFormMonth').value = report.month;
+      $('marketingFormSource').value = report.sourceType;
+      $('marketingFormUrl').value = report.sourceType === 'url' ? report.url : '';
+      $('deleteMarketingBtn').classList.remove('hidden');
+    } else {
+      $('marketingModalTitle').textContent = 'Upload marketing report';
+      $('marketingFormId').value = '';
+      $('deleteMarketingBtn').classList.add('hidden');
+    }
+    toggleMarketingSourceFields();
+    openModal('marketingModal');
+  }
+
+  async function handleMarketingFormSubmit(e) {
+    e.preventDefault();
+    $('marketingFormError').classList.add('hidden');
+    const id = $('marketingFormId').value;
+    const month = $('marketingFormMonth').value;
+    const sourceType = $('marketingFormSource').value;
+    if (!month) { showFormError('marketingFormError', 'Pick a month.'); return; }
+    const btn = $('marketingFormSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const docId = id || month;
+      const payload = { month, sourceType, uploadedBy: currentUser.fullName, uploadedAt: firebase.firestore.FieldValue.serverTimestamp() };
+      if (sourceType === 'url') {
+        const url = $('marketingFormUrl').value.trim();
+        if (!url) throw new Error('Enter a URL.');
+        payload.url = url;
+      } else {
+        const file = $('marketingFormFile').files[0];
+        if (file) await storage.ref('marketingReports/' + docId).put(file);
+        else if (!id) throw new Error('Choose a PDF file.');
+        payload.sourceType = 'uploaded';
+      }
+      await db.collection('marketingReports').doc(docId).set(payload, { merge: true });
+      closeModal('marketingModal');
+    } catch (err) {
+      showFormError('marketingFormError', err.message || 'Could not save this report.');
+    }
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+
+  async function handleDeleteMarketing() {
+    const id = $('marketingFormId').value;
+    if (!id) return;
+    if (!confirm('Delete this month\'s marketing report? This removes it for all users.')) return;
+    try {
+      try { await storage.ref('marketingReports/' + id).delete(); } catch (e) { /* may be a URL-sourced report */ }
+      await db.collection('marketingReports').doc(id).delete();
+      closeModal('marketingModal');
+    } catch (err) {
+      showFormError('marketingFormError', err.message || 'Could not delete this report.');
+    }
+  }
+
+  /* --------------------------------------------------------------
+     4.13  MODAL HELPERS
      -------------------------------------------------------------- */
   function openModal(id) { $(id).classList.add('open'); }
   function closeModal(id) { $(id).classList.remove('open'); }
@@ -1705,6 +2514,42 @@
     $('reportForm').addEventListener('submit', handleReportFormSubmit);
     $('deleteReportBtn').addEventListener('click', handleDeleteReport);
     $('reportFormSource').addEventListener('change', toggleReportSourceFields);
+
+    // ---------- Position Reports ----------
+    $('positionWeekSelect').addEventListener('change', (e) => loadPositionWeek(e.target.value));
+    $('positionNewWeekBtn').addEventListener('click', startNewPositionWeek);
+    $('positionSaveBtn').addEventListener('click', savePositionWeek);
+    $('positionBody').addEventListener('input', handlePositionInput);
+    $('positionBody').addEventListener('change', handlePositionInput);
+    $('positionBody').addEventListener('click', handlePositionRemove);
+    $('positionBody').addEventListener('focusout', (e) => {
+      if (e.target.dataset && e.target.dataset.numeric === '1') e.target.value = posFmt(posParseNum(e.target.value));
+    });
+    document.querySelectorAll('.postab-btn').forEach((btn) => btn.addEventListener('click', () => {
+      document.querySelectorAll('.postab-btn').forEach((b) => b.dataset.active = 'false');
+      btn.dataset.active = 'true';
+      document.querySelectorAll('.postab-panel').forEach((p) => p.classList.add('hidden'));
+      $('postab-' + btn.dataset.postab).classList.remove('hidden');
+    }));
+    $('positionOtherAddRow').addEventListener('click', () => { positionData.otherTracked.push({ item: '', opening: 0, movement: 0, closing: 0, remarks: '' }); renderPositionOther(); recalcPositionTotals(); });
+    $('positionBankAddRow').addEventListener('click', () => { positionData.bank.push({ entity: 'SPPL', account: '', opening: 0, receipts: 0, payments: 0, balAsOf: 0, remarks: '' }); renderPositionBank(); recalcPositionTotals(); });
+    $('positionImpexAddRow').addEventListener('click', () => { positionData.impex.push({ sn: positionData.impex.length + 1, desc: '', lc: '', fc: 0, month: 'AUGUST', amt: 0 }); renderPositionImpex(); recalcPositionTotals(); });
+    $('positionUpcomingAddRow').addEventListener('click', () => { positionData.payables.upcoming.push({ item: '', amt: 0, notes: '' }); renderPositionPayables(); recalcPositionTotals(); });
+    $('positionOverdueAddRow').addEventListener('click', () => { positionData.payables.vendorOverdue.push({ item: '', amt: 0, notes: '' }); renderPositionPayables(); recalcPositionTotals(); });
+
+    // ---------- Product Costing ----------
+    $('costingCostFile').addEventListener('change', (e) => handleCostingUpload('cost', e.target.files[0]));
+    $('costingMrpFile').addEventListener('change', (e) => handleCostingUpload('mrp', e.target.files[0]));
+    $('costingNetFile').addEventListener('change', (e) => handleCostingUpload('net', e.target.files[0]));
+    $('costingTypeFilter').addEventListener('change', () => applyCostingFilters());
+    $('costingStatusFilter').addEventListener('change', () => applyCostingFilters());
+    $('costingSearch').addEventListener('input', () => applyCostingFilters());
+
+    // ---------- Marketing Report ----------
+    $('addMarketingBtn').addEventListener('click', () => openMarketingModal(null));
+    $('marketingForm').addEventListener('submit', handleMarketingFormSubmit);
+    $('deleteMarketingBtn').addEventListener('click', handleDeleteMarketing);
+    $('marketingFormSource').addEventListener('change', toggleMarketingSourceFields);
 
     document.querySelectorAll('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => closeModal(btn.dataset.closeModal)));
     document.querySelectorAll('.modal-overlay').forEach((ov) => ov.addEventListener('click', (e) => { if (e.target === ov) closeModal(ov.id); }));
